@@ -11,11 +11,11 @@
     "postinstall": "cd ../../packages/database && npx prisma generate"
   },
   "dependencies": {
-    "@clerk/nextjs": "^5.0.0",
+    "@clerk/nextjs": "^4.29.9",
+    "@neondatabase/serverless": "^0.10.0",
     "@porter/database": "workspace:*",
     "@porter/shared": "workspace:*",
     "@prisma/adapter-neon": "^6.0.0",
-    "@neondatabase/serverless": "^0.10.0",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",

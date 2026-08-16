@@ -1,28 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground: #171717;
-  --background: #ffffff;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground: #ededed;
-    --background: #0a0a0a;
-  }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #09090b;
+  color: #fafafa;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@layer utilities {
-  .glass {
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-  }
+/* Clerk overrides - dark theme that actually works */
+.clerk-root {
+  --clerk-font-family: 'Inter', system-ui, sans-serif;
+}
+
+.clerk-card {
+  background: #18181b !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5) !important;
+}
+
+.clerk-card .cl-formFieldInput,
+.clerk-card input[type="text"],
+.clerk-card input[type="email"],
+.clerk-card input[type="password"] {
+  background: #09090b !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+  color: #fafafa !important;
+  padding: 10px 14px !important;
+}
+
+.clerk-card .cl-formFieldInput:focus,
+.clerk-card input:focus {
+  border-color: #f97316 !important;
+  box-shadow: 0 0 0 2px rgba(249,115,22,0.2) !important;
+}
+
+.clerk-card .cl-formFieldLabel {
+  color: #a1a1aa !important;
+  font-size: 13px !important;
+}
+
+.clerk-card button.cl-internal-button,
+.clerk-card button[type="submit"] {
+  background: #f97316 !important;
+  color: #000 !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: 10px 16px !important;
+  transition: background 0.15s !important;
+}
+
+.clerk-card button.cl-internal-button:hover,
+.clerk-card button[type="submit"]:hover {
+  background: #ea580c !important;
+}
+
+.clerk-card .cl-dividerLine {
+  background: rgba(255,255,255,0.08) !important;
+}
+
+.clerk-card .cl-dividerText {
+  color: #71717a !important;
+}
+
+.clerk-card .cl-socialButtonsBlockButton {
+  background: #09090b !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+  color: #fafafa !important;
+}
+
+.clerk-card .cl-socialButtonsBlockButton:hover {
+  background: #18181b !important;
+  border-color: rgba(255,255,255,0.2) !important;
+}
+
+.clerk-card .cl-footerActionLink,
+.clerk-card a {
+  color: #f97316 !important;
+}
+
+.clerk-card .cl-formFieldErrorText {
+  color: #ef4444 !important;
+}
+
+.clerk-card .cl-internal-button {
+  background: #f97316 !important;
+  color: #000 !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
 }

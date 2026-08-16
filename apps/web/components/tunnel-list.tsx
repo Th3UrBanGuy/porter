@@ -3,17 +3,6 @@
 import { useState } from "react";
 import { useTunnelStatus } from "@/hooks/use-tunnel-status";
 
-interface Tunnel {
-  id: string;
-  subdomain: string;
-  domain: string;
-  port: number;
-  status: string;
-  url: string | null;
-  connector: { name: string; status: string };
-  createdAt: string;
-}
-
 export function TunnelList() {
   const { tunnels, refresh } = useTunnelStatus();
 
@@ -28,11 +17,14 @@ export function TunnelList() {
 
   if (tunnels.length === 0) {
     return (
-      <div className="p-12 text-center text-gray-500 text-sm">
-        <div className="text-3xl mb-3">◉</div>
-        No tunnels yet.
-        <br />
-        Create one to expose a local service.
+      <div className="p-12 text-center">
+        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-4 text-zinc-600">
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m0-7.172a4 4 0 015.656 0l4 4a4 4 0 01-5.656 5.656l-1.102-1.101" />
+          </svg>
+        </div>
+        <p className="text-sm text-zinc-500">No tunnels yet</p>
+        <p className="text-xs text-zinc-600 mt-1">Create one to expose a local service</p>
       </div>
     );
   }
@@ -42,23 +34,23 @@ export function TunnelList() {
       {tunnels.map((tunnel) => (
         <div
           key={tunnel.id}
-          className="p-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+          className="px-5 py-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
         >
           <div className="flex items-center gap-3">
             <div
               className={`w-2 h-2 rounded-full ${
                 tunnel.status === "active"
-                  ? "bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.5)]"
+                  ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]"
                   : tunnel.status === "error"
                   ? "bg-red-400"
-                  : "bg-gray-500"
+                  : "bg-zinc-600"
               }`}
             />
             <div>
               <div className="text-sm font-medium">
                 {tunnel.subdomain}.{tunnel.domain}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-zinc-500">
                 Port {tunnel.port} · {tunnel.connector.name}
               </div>
             </div>
@@ -69,18 +61,18 @@ export function TunnelList() {
                 href={tunnel.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
+                className="text-xs text-orange-500 hover:text-orange-400 transition-colors"
               >
                 {tunnel.url}
               </a>
             )}
             <span
-              className={`text-xs px-2 py-1 rounded-full ${
+              className={`text-xs px-2.5 py-1 rounded-full ${
                 tunnel.status === "active"
-                  ? "bg-green-500/10 text-green-400"
+                  ? "bg-emerald-500/10 text-emerald-400"
                   : tunnel.status === "error"
                   ? "bg-red-500/10 text-red-400"
-                  : "bg-gray-500/10 text-gray-400"
+                  : "bg-zinc-500/10 text-zinc-400"
               }`}
             >
               {tunnel.status}
@@ -88,7 +80,7 @@ export function TunnelList() {
             {tunnel.status === "active" && (
               <button
                 onClick={() => stopTunnel(tunnel.id)}
-                className="text-xs text-gray-400 hover:text-red-400 transition-colors"
+                className="text-xs text-zinc-500 hover:text-red-400 transition-colors"
               >
                 Stop
               </button>

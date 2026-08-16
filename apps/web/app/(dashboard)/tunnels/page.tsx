@@ -13,23 +13,23 @@ export default async function TunnelsPage() {
   });
 
   return (
-    <div className="max-w-5xl">
+    <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-1">Tunnels</h1>
-        <p className="text-gray-400 text-sm">
+        <h1 className="text-2xl font-bold tracking-tight">Tunnels</h1>
+        <p className="text-sm text-zinc-500 mt-1">
           Manage your Cloudflare tunnels
         </p>
       </div>
 
-      {/* Create tunnel form */}
-      <div className="mb-8 p-6 rounded-xl bg-white/5 border border-white/10">
+      {/* Create tunnel */}
+      <div className="mb-8 p-6 rounded-xl bg-white/[0.02] border border-white/5">
         <h2 className="font-semibold mb-4">Create Tunnel</h2>
         <CreateTunnelForm connectors={connectors} onCreated={() => {}} />
       </div>
 
       {/* Tunnel list */}
-      <div className="rounded-xl bg-white/5 border border-white/10">
-        <div className="p-4 border-b border-white/10">
+      <div className="rounded-xl bg-white/[0.02] border border-white/5">
+        <div className="px-5 py-4 border-b border-white/5">
           <h2 className="font-semibold">Active Tunnels</h2>
         </div>
         <TunnelList />

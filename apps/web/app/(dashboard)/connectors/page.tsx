@@ -6,10 +6,10 @@ export default async function ConnectorsPage() {
   if (!user) return null;
 
   return (
-    <div className="max-w-5xl">
+    <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-1">Connectors</h1>
-        <p className="text-gray-400 text-sm">
+        <h1 className="text-2xl font-bold tracking-tight">Connectors</h1>
+        <p className="text-sm text-zinc-500 mt-1">
           Manage your device connectors
         </p>
       </div>
