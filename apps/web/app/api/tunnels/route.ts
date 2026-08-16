@@ -1,56 +1,47 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { sendCommandToConnector } from "@/lib/ws-client";
+import { CloudflareClient } from "@/lib/cloudflare";
 
-export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
+export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const tunnels = await prisma.tunnel.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    include: { connector: true },
-  });
-
-  return NextResponse.json({ tunnels });
-}
-
-export async function POST(req: Request) {
-  const user = await getCurrentUser();
+  // Get user from DB
+  const user = await prisma.user.findUnique({ where: { clerkId: userId } });
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
   const { subdomain, domain, port, connectorId } = await req.json();
 
   if (!subdomain || !domain || !port || !connectorId) {
-    return NextResponse.json(
-      { error: "Missing required fields" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  // Validate subdomain format
-  if (!/^[a-z0-9-]+$/.test(subdomain)) {
-    return NextResponse.json(
-      { error: "Subdomain must be lowercase alphanumeric with hyphens" },
-      { status: 400 }
-    );
-  }
-
-  // Verify connector belongs to user
+  // Check connector belongs to user and is online
   const connector = await prisma.connector.findFirst({
     where: { id: connectorId, userId: user.id },
   });
 
   if (!connector) {
-    return NextResponse.json({ error: "Connector not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Connector not found" },
+      { status: 404 }
+    );
   }
 
-  // Check for existing tunnel with same subdomain/domain
+  if (connector.status !== "online") {
+    return NextResponse.json(
+      { error: "Connector is offline" },
+      { status: 400 }
+    );
+  }
+
+  // Check subdomain uniqueness
   const existing = await prisma.tunnel.findUnique({
     where: { subdomain_domain: { subdomain, domain } },
   });
@@ -62,7 +53,16 @@ export async function POST(req: Request) {
     );
   }
 
-  // Create tunnel record
+  // Get Cloudflare client for this user
+  const cf = await CloudflareClient.fromUserId(user.id);
+  if (!cf) {
+    return NextResponse.json(
+      { error: "Cloudflare not connected" },
+      { status: 400 }
+    );
+  }
+
+  // Create tunnel record in DB first
   const tunnel = await prisma.tunnel.create({
     data: {
       userId: user.id,
@@ -70,14 +70,13 @@ export async function POST(req: Request) {
       subdomain,
       domain,
       port: parseInt(port),
-      url: `https://${subdomain}.${domain}`,
-      status: "inactive",
+      status: "creating",
     },
   });
 
-  // Send command to connector via WebSocket
+  // Send create command to connector
   try {
-    const result = await sendCommandToConnector(
+    await sendCommandToConnector(
       connectorId,
       "create_tunnel",
       {
@@ -88,39 +87,53 @@ export async function POST(req: Request) {
       },
       30000
     );
+  } catch (err: any) {
+    console.error("Failed to send create command:", err.message);
+    await prisma.tunnel.update({
+      where: { id: tunnel.id },
+      data: { status: "error" },
+    });
+    return NextResponse.json(
+      { error: "Failed to reach connector" },
+      { status: 500 }
+    );
+  }
 
-    // Update tunnel status based on response
-    if (result.type === "tunnel_active") {
-      await prisma.tunnel.update({
-        where: { id: tunnel.id },
-        data: { status: "active" },
-      });
+  // Create DNS CNAME record (pointing to tunnel)
+  try {
+    const mcp = await prisma.mcpConnection.findUnique({
+      where: { userId: user.id },
+    });
 
-      return NextResponse.json({
-        tunnel: {
-          ...tunnel,
-          status: "active",
-          url: result.payload.url,
-        },
-      });
-    } else {
-      await prisma.tunnel.update({
-        where: { id: tunnel.id },
-        data: { status: "error" },
-      });
+    if (mcp?.accountId) {
+      const cfAccountId = mcp.accountId;
+      const tunnelUrl = `${subdomain}.${domain}`;
 
-      return NextResponse.json(
-        { error: result.payload?.message || "Failed to create tunnel" },
-        { status: 500 }
+      // Create CNAME pointing to the tunnel
+      await cf.createDNSRecord(
+        mcp.accountId,
+        "CNAME",
+        tunnelUrl,
+        `${tunnel.id}.cfargotunnel.com`,
+        true
       );
+
+      console.log(`Created DNS record: ${tunnelUrl} -> ${tunnel.id}.cfargotunnel.com`);
     }
   } catch (err: any) {
-    // Connector might be offline — tunnel stays inactive
-    console.error("Failed to send command to connector:", err.message);
-
-    return NextResponse.json({
-      tunnel,
-      warning: "Connector is offline. Tunnel will activate when connector connects.",
-    });
+    console.error("DNS creation failed:", err.message);
+    // Don't fail tunnel creation if DNS fails - can be retried later
   }
+
+  return NextResponse.json({
+    success: true,
+    tunnel: {
+      id: tunnel.id,
+      subdomain: tunnel.subdomain,
+      domain: tunnel.domain,
+      port: tunnel.port,
+      status: tunnel.status,
+      url: `https://${tunnel.subdomain}.${tunnel.domain}`,
+    },
+  });
 }
