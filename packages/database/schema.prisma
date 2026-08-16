@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  clerkId       String         @unique
+  email         String
+  name          String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  connectors    Connector[]
+  tunnels       Tunnel[]
+  mcpConnection McpConnection?
+}
+
+model Connector {
+  id        String     @id @default(uuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  token     String     @unique
+  status    String     @default("offline") // online, offline, error
+  lastSeen  DateTime?
+  metadata  Json?      // { os, ip, version, hostname }
+  tunnels   Tunnel[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([userId])
+}
+
+model Tunnel {
+  id                 String    @id @default(uuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectorId        String
+  connector          Connector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  subdomain          String
+  domain             String
+  port               Int
+  status             String    @default("inactive") // active, inactive, error
+  cloudflareTunnelId String?
+  url                String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([subdomain, domain])
+  @@index([userId])
+  @@index([connectorId])
+}
+
+model McpConnection {
+  id           String    @id @default(uuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  clientInfo   Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}

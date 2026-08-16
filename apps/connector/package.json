@@ -1,0 +1,22 @@
+{
+  "name": "porter-connect",
+  "version": "0.1.0",
+  "description": "Porter connector - expose local services via Cloudflare tunnels",
+  "bin": {
+    "porter-connect": "./bin/porter"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "clean": "rm -rf dist .turbo node_modules"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@porter/ws-service",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist .turbo node_modules"
+  },
+  "dependencies": {
+    "@porter/database": "workspace:*",
+    "@porter/shared": "workspace:*",
+    "socket.io": "^4.7.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0"
+  }
+}

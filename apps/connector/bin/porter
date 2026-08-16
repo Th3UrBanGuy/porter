@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+
+import { startConnector } from "../src/index";
+
+const args = process.argv.slice(2);
+
+// Parse args
+function getArg(name: string): string | undefined {
+  const idx = args.indexOf(`--${name}`);
+  return idx !== -1 ? args[idx + 1] : undefined;
+}
+
+const token = getArg("token");
+const wsUrl = getArg("ws-url") || process.env.PORTER_WS_URL || "ws://localhost:3001";
+
+if (!token) {
+  console.error("Usage: porter-connect --token <connector-token> [--ws-url <url>]");
+  console.error("");
+  console.error("Options:");
+  console.error("  --token <token>     Connector token from Porter dashboard");
+  console.error("  --ws-url <url>      WebSocket server URL (default: ws://localhost:3001)");
+  console.error("");
+  console.error("Get your token from: Porter Dashboard → Connectors → New Connector");
+  process.exit(1);
+}
+
+console.log(`
+╔═══════════════════════════════════════════╗
+║          Porter Connector v0.1.0          ║
+╚═══════════════════════════════════════════╝
+`);
+
+startConnector(token, wsUrl);
