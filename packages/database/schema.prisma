@@ -64,9 +64,11 @@ model McpConnection {
   accessToken  String
   refreshToken String?
   expiresAt    DateTime?
-  state        String?   // OAuth CSRF state
-  accountId    String?   // Cloudflare account ID
-  accountName  String?   // Cloudflare account name
+  state        String?
+  codeVerifier String?
+  clientInfo   Json?     // MCP client registration info
+  accountId    String?
+  accountName  String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
