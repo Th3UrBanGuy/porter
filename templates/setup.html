@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f6821f">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<title>Setup - Tunnel Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,sans-serif;--radius:20px;--radius-sm:10px;--accent:#f6821f;--accent2:#e65c00;--green:#22c55e;--red:#ef4444;--transition:all .25s ease;--safe-b:env(safe-area-inset-bottom,0px)}
+  [data-theme="dark"]{--bg:#06060e;--surface:rgba(14,14,24,.65);--surface2:rgba(255,255,255,.03);--border:rgba(255,255,255,.05);--border-focus:rgba(246,130,31,.4);--text:#e8e8ec;--text2:#888;--text3:#555;--orb1:#f6821f;--orb2:#6366f1}
+  [data-theme="light"]{--bg:#f4f4f7;--surface:rgba(255,255,255,.85);--surface2:rgba(0,0,0,.02);--border:rgba(0,0,0,.06);--border-focus:rgba(246,130,31,.5);--text:#1a1a2e;--text2:#666;--text3:#999;--orb1:#f6821f;--orb2:#6366f1}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:16px;padding-bottom:calc(16px + var(--safe-b));-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
+  @media(min-width:640px){body{padding:20px}}
+
+  .bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .bg-orb{position:absolute;border-radius:50%;filter:blur(120px);opacity:.06}
+  .bg-orb-1{width:500px;height:500px;background:var(--orb1);top:-150px;left:-100px;animation:orbFloat 25s ease-in-out infinite}
+  .bg-orb-2{width:400px;height:400px;background:var(--orb2);bottom:-150px;right:-100px;animation:orbFloat 20s ease-in-out infinite reverse}
+  @keyframes orbFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-20px)}}
+
+  .setup{position:relative;z-index:1;width:100%;max-width:460px}
+  .card{background:var(--surface);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;margin-bottom:12px;box-shadow:0 24px 80px rgba(0,0,0,.2);transition:var(--transition)}
+  @media(min-width:640px){.card{padding:36px 32px;margin-bottom:14px}}
+
+  .header{text-align:center;margin-bottom:24px}
+  @media(min-width:640px){.header{margin-bottom:32px}}
+  .header-icon{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:inline-flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:14px;box-shadow:0 8px 32px rgba(246,130,31,.25);color:#000;font-weight:800}
+  @media(min-width:640px){.header-icon{width:64px;height:64px;border-radius:18px;font-size:30px;margin-bottom:16px}}
+  .header h1{font-size:20px;font-weight:700;margin-bottom:6px;letter-spacing:-.5px}
+  @media(min-width:640px){.header h1{font-size:22px}}
+  .header p{font-size:13px;color:var(--text3);line-height:1.5}
+
+  .alert{padding:14px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+  .alert-error{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.12);color:#fca5a5}
+  [data-theme="light"] .alert-error{color:#dc2626}
+  .alert-success{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.12);color:#86efac}
+  [data-theme="light"] .alert-success{color:#16a34a}
+
+  .step{margin-bottom:12px;padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;transition:var(--transition)}
+  @media(min-width:640px){.step{margin-bottom:16px;padding:20px;border-radius:16px}}
+  .step.active{border-color:rgba(246,130,31,.15);background:rgba(246,130,31,.02)}
+  .step.done{border-color:rgba(34,197,94,.1);background:rgba(34,197,94,.02)}
+  .step-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .step-num{width:28px;height:28px;border-radius:50%;background:var(--surface2);color:var(--text3);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;transition:var(--transition)}
+  .step.active .step-num{background:var(--accent);color:#000}
+  .step.done .step-num{background:var(--green);color:#000}
+  .step-title{font-size:14px;font-weight:600;color:var(--text2)}
+  .step.done .step-title{color:var(--green)}
+  .step-desc{font-size:12px;color:var(--text3);margin-left:40px;margin-bottom:12px;line-height:1.5}
+
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+  .field input{width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;font-weight:500;outline:none;transition:var(--transition);font-family:var(--font)}
+  .field input::placeholder{color:var(--text3)}
+  .field input:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(246,130,31,.06)}
+
+  .btn{padding:12px 18px;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;transition:var(--transition);font-family:var(--font);min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+  @media(min-width:640px){.btn{padding:12px 20px;font-size:13px}}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;box-shadow:0 2px 12px rgba(246,130,31,.2)}
+  .btn-primary:hover{box-shadow:0 4px 20px rgba(246,130,31,.35);transform:translateY(-1px)}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text3);font-weight:600}
+  .btn-outline:hover{border-color:color-mix(in srgb,var(--text3) 40%,transparent);color:var(--text2)}
+  .btn-danger{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.12);color:#fca5a5;font-weight:600}
+  [data-theme="light"] .btn-danger{color:#dc2626}
+  .btn-danger:hover{background:rgba(239,68,68,.1)}
+  .btn-sm{padding:8px 14px;font-size:11px}
+
+  .connected-info{margin-left:40px;display:flex;gap:8px;align-items:center}
+  .connected-badge{color:var(--green);font-size:12px;font-weight:600}
+
+  .footer{margin-top:24px;text-align:center;display:flex;gap:10px;justify-content:center}
+
+  .danger-zone{padding:20px;background:rgba(239,68,68,.02);border:1px solid rgba(239,68,68,.08);border-radius:16px}
+  .danger-zone h3{font-size:14px;font-weight:700;color:#fca5a5;margin-bottom:6px}
+  [data-theme="light"] .danger-zone h3{color:#dc2626}
+  .danger-zone p{font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.5}
+
+  .theme-toggle{position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:var(--transition)}
+  .theme-toggle:hover{border-color:var(--accent);color:var(--accent)}
+
+  .corner-brand{position:fixed;bottom:calc(12px + var(--safe-b));right:12px;z-index:40;background:var(--surface);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:10px;color:var(--text3);display:flex;align-items:center;gap:5px;box-shadow:0 4px 16px rgba(0,0,0,.1);transition:var(--transition)}
+  @media(min-width:640px){.corner-brand{bottom:16px;right:16px;padding:8px 14px;font-size:11px;border-radius:12px}}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  .card{animation:fadeUp .5s ease-out both}
+  @media(max-width:400px){
+    .step-desc{margin-left:0;margin-top:8px}
+    .connected-info{margin-left:0;flex-direction:column;align-items:flex-start}
+    form[style*="margin-left:40px"]{margin-left:0!important}
+    .danger-zone h3{font-size:13px}
+    .danger-zone p{font-size:11px}
+    .field input{font-size:14px}
+  }
+</style>
+</head>
+<body>
+<div class="bg">
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+</div>
+
+<div class="setup">
+  <div class="card" style="position:relative">
+    <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">&#9790;</button>
+    <div class="header">
+      <div class="header-icon">&#9729;</div>
+      <h1>Tunnel Portal</h1>
+      <p>Expose local services on your own domain</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    {% if success %}
+    <div class="alert alert-success">{{ success }}</div>
+    {% endif %}
+
+    <div class="step {{ 'done' if is_connected else 'active' }}">
+      <div class="step-head">
+        <div class="step-num">1</div>
+        <div class="step-title">Connect Cloudflare</div>
+      </div>
+      <div class="step-desc">Authorize the portal to manage your DNS, tunnels, and Zero Trust settings.</div>
+      {% if is_connected %}
+        <div class="connected-info">
+          <span class="connected-badge">Connected</span>
+          <form method="POST" action="/auth/disconnect" style="display:inline">
+            <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Disconnect from Cloudflare?')">Disconnect</button>
+          </form>
+        </div>
+      {% else %}
+        <div style="margin-left:40px">
+          <a href="/auth/cloudflare" class="btn btn-primary" style="text-decoration:none;display:inline-block">Connect Cloudflare</a>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="step {{ 'done' if cfg.get('passcode_hash') else 'active' }}">
+      <div class="step-head">
+        <div class="step-num">2</div>
+        <div class="step-title">{% if cfg.get('passcode_hash') %}Passcode Set{% else %}Set Passcode{% endif %}</div>
+      </div>
+      <div class="step-desc">Protect the portal with a passcode.</div>
+      <form method="POST" style="margin-left:40px">
+        <input type="hidden" name="action" value="set_passcode">
+        <div class="field" style="margin-bottom:10px">
+          <input type="password" name="passcode" placeholder="{% if cfg.get('passcode_hash') %}Enter new passcode{% else %}Min 4 characters{% endif %}" autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn-outline btn-sm">Save Passcode</button>
+      </form>
+    </div>
+
+    <div class="footer">
+      <a href="/" class="btn btn-outline">Dashboard</a>
+      <a href="/docs" class="btn btn-outline">Docs</a>
+    </div>
+  </div>
+
+  {% if setup_done %}
+  <div class="card">
+    <div class="step active">
+      <div class="step-head">
+        <div class="step-num" style="background:rgba(99,102,241,.1);color:#818cf8">P</div>
+        <div class="step-title">Protocol Settings</div>
+      </div>
+      <div class="step-desc">Choose the tunnel protocol. HTTP/2 is recommended for WSL2 or unstable UDP environments.</div>
+      <form method="POST" style="margin-left:40px">
+        <input type="hidden" name="action" value="set_protocol">
+        <div class="field" style="margin-bottom:10px">
+          <select name="protocol" style="width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;font-weight:500;outline:none;font-family:var(--font);appearance:none;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23999'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;cursor:pointer" required>
+            <option value="auto" {{ 'selected' if cfg.get('protocol','auto') == 'auto' }}>Auto (WSL2-aware)</option>
+            <option value="quic" {{ 'selected' if cfg.get('protocol') == 'quic' }}>QUIC (faster, needs stable UDP)</option>
+            <option value="http2" {{ 'selected' if cfg.get('protocol') == 'http2' }}>HTTP/2 (more compatible)</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-outline btn-sm">Save Protocol</button>
+      </form>
+    </div>
+
+    <div style="margin-top:16px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
+      <h3 style="margin:0 0 8px;font-size:14px;font-weight:700;color:var(--text)">API Keys</h3>
+      <p style="margin:0 0 12px;font-size:12px;color:var(--text2)">Manage API keys for programmatic access via CLI or scripts.</p>
+      <div id="keysList" style="margin-bottom:12px;font-size:12px;color:var(--text2)">Loading...</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="keyName" placeholder="Key name" style="flex:1;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:12px;font-family:var(--font)">
+        <button onclick="createKey()" class="btn btn-outline btn-sm">Create Key</button>
+      </div>
+      <div id="newKeyBox" style="display:none;margin-top:12px;padding:10px;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:var(--radius-sm);font-size:12px">
+        <div style="font-weight:600;color:var(--green);margin-bottom:6px">Key Created!</div>
+        <div id="newKeyValue" style="font-family:monospace;word-break:break-all;color:var(--text)"></div>
+        <div style="margin-top:6px;color:var(--text2);font-size:11px">Copy this key now. It will not be shown again.</div>
+      </div>
+    </div>
+
+    <div class="danger-zone" style="margin-top:16px">
+      <h3>Danger Zone</h3>
+      <p>Stop all tunnels, disconnect Cloudflare, and clear all settings.</p>
+      <form method="POST" onsubmit="return confirm('This will stop all tunnels and disconnect Cloudflare. Are you sure?')">
+        <input type="hidden" name="action" value="reset">
+        <button type="submit" class="btn btn-danger btn-sm">Reset Everything</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="corner-brand">
+    Built by <span class="dot"></span> <a href="https://Tect0nic.com" target="_blank" rel="noopener">Tect0nic</a>
+  </div>
+</div>
+
+<script>
+const savedTheme = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', savedTheme);
+document.getElementById('themeBtn').textContent = savedTheme === 'dark' ? '\u263C' : '\u263E';
+function toggleTheme() { const html = document.documentElement; const cur = html.getAttribute('data-theme'); const next = cur === 'dark' ? 'light' : 'dark'; html.setAttribute('data-theme', next); localStorage.setItem('theme', next); document.getElementById('themeBtn').textContent = next === 'dark' ? '\u263C' : '\u263E'; }
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw.js').catch(() => {}); }
+
+// API Keys management
+function loadKeys() {
+  fetch('/api/keys').then(r => r.json()).then(data => {
+    const keys = data.keys || [];
+    const el = document.getElementById('keysList');
+    if (!keys.length) { el.textContent = 'No API keys yet'; return; }
+    el.innerHTML = keys.map(k =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span><b>${k.name}</b> <span style="color:var(--text3)">${k.key_prefix || ''}</span></span>
+        <button onclick="deleteKey('${k.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:11px">Delete</button>
+      </div>`
+    ).join('');
+  }).catch(() => { document.getElementById('keysList').textContent = 'Failed to load'; });
+}
+function createKey() {
+  const name = document.getElementById('keyName').value.trim();
+  if (!name) return;
+  fetch('/api/keys', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name}) })
+    .then(r => r.json()).then(data => {
+      if (data.key) {
+        document.getElementById('newKeyValue').textContent = data.key;
+        document.getElementById('newKeyBox').style.display = 'block';
+        document.getElementById('keyName').value = '';
+        loadKeys();
+      }
+    }).catch(() => alert('Failed to create key'));
+}
+function deleteKey(id) {
+  if (!confirm('Delete this API key?')) return;
+  fetch('/api/keys/' + id, { method: 'DELETE' }).then(() => loadKeys());
+}
+loadKeys();
+</script>
+</body>
+</html>

@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f6821f">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<title>Documentation - Tunnel Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,sans-serif;--accent:#f6821f;--accent2:#e65c00;--transition:all .25s ease;--safe-b:env(safe-area-inset-bottom,0px)}
+  [data-theme="dark"]{--bg:#06060e;--surface:rgba(14,14,24,.65);--surface2:rgba(255,255,255,.03);--border:rgba(255,255,255,.05);--text:#e8e8ec;--text2:#aaa;--text3:#666;--code-bg:rgba(255,255,255,.04)}
+  [data-theme="light"]{--bg:#f4f4f7;--surface:rgba(255,255,255,.85);--surface2:rgba(0,0,0,.02);--border:rgba(0,0,0,.06);--text:#1a1a2e;--text2:#555;--text3:#999;--code-bg:rgba(0,0,0,.04)}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
+
+  .topbar{background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;transition:var(--transition)}
+  @media(min-width:640px){.topbar{padding:14px 24px}}
+  .topbar-left{display:flex;align-items:center;gap:12px}
+  .topbar-logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:16px;color:#000;font-weight:800;box-shadow:0 2px 12px rgba(246,130,31,.25)}
+  .topbar-title{font-size:15px;font-weight:600;color:var(--text)}
+  .topbar-right{display:flex;align-items:center;gap:12px}
+  .topbar-right a{color:var(--text3);text-decoration:none;font-size:13px;transition:color .2s}
+  .topbar-right a:hover{color:var(--accent)}
+  .theme-toggle{width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:var(--transition)}
+  .theme-toggle:hover{border-color:var(--accent);color:var(--accent)}
+
+  .hero{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 8%,var(--bg)) 0%,var(--bg) 50%,color-mix(in srgb,#6366f1 5%,var(--bg)) 100%);border-bottom:1px solid var(--border);padding:60px 16px;text-align:center}
+  @media(min-width:640px){.hero{padding:60px 24px}}
+  .hero h1{font-size:36px;font-weight:800;margin-bottom:12px;color:var(--text);letter-spacing:-.5px}
+  .hero h1 span{color:var(--accent)}
+  .hero p{color:var(--text2);font-size:16px;max-width:600px;margin:0 auto}
+  .hero .badge{display:inline-block;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;margin-top:16px;letter-spacing:.2px}
+
+  .container{max-width:900px;margin:0 auto;padding:24px 16px calc(40px + var(--safe-b))}
+  @media(min-width:640px){.container{padding:40px 24px 100px}}
+
+  .toc{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:40px;backdrop-filter:blur(20px);transition:var(--transition)}
+  .toc h3{font-size:14px;font-weight:700;margin-bottom:12px;color:var(--accent)}
+  .toc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+  .toc a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:8px;transition:all .2s}
+  .toc a:hover{background:var(--surface2);color:var(--accent)}
+
+  .section{margin-bottom:48px}
+  .section h2{font-size:22px;font-weight:700;margin-bottom:16px;color:var(--text);padding-bottom:8px;border-bottom:1px solid var(--border);letter-spacing:-.3px}
+  .section h3{font-size:16px;font-weight:600;margin:24px 0 12px;color:var(--text)}
+  .section p{color:var(--text2);font-size:14px;margin-bottom:12px}
+  .section ul,.section ol{margin:12px 0 12px 20px;color:var(--text2);font-size:14px}
+  .section li{margin-bottom:8px}
+  .section code{background:var(--code-bg);padding:2px 8px;border-radius:5px;font-size:13px;color:var(--accent);font-weight:500}
+  .section pre{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;overflow-x:auto;margin:12px 0;transition:var(--transition)}
+  .section pre code{background:none;padding:0;color:var(--text)}
+
+  .diagram{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;margin:24px 0;text-align:center;transition:var(--transition)}
+  .diagram pre{background:none;border:none;padding:0;text-align:left;display:inline-block;font-size:13px;line-height:1.5;color:var(--text3)}
+  .diagram .highlight{color:var(--accent)}
+  .diagram .dim{color:var(--text3)}
+
+  .flow{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin:24px 0}
+  .flow-step{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;text-align:center;min-width:100px;transition:var(--transition)}
+  .flow-step .icon{font-size:24px;margin-bottom:6px}
+  .flow-step .label{font-size:12px;color:var(--text2)}
+  .flow-arrow{color:var(--accent);font-size:20px}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin:24px 0}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;transition:var(--transition)}
+  .stat .num{font-size:28px;font-weight:800;color:var(--accent)}
+  .stat .label{font-size:12px;color:var(--text3);margin-top:4px}
+
+  .table-wrap{overflow-x:auto;margin:16px 0}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:var(--surface2);text-align:left;padding:10px 14px;color:var(--text2);font-weight:600;border-bottom:1px solid var(--border)}
+  td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text)}
+  tr:hover td{background:var(--surface2)}
+
+  .tip{background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.12);border-radius:12px;padding:14px 18px;margin:16px 0;font-size:13px;color:var(--green)}
+  [data-theme="light"] .tip{color:#16a34a}
+  .tip::before{content:"TIP: ";font-weight:700}
+  .warn{background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.12);border-radius:12px;padding:14px 18px;margin:16px 0;font-size:13px;color:#fbbf24}
+  [data-theme="light"] .warn{color:#b45309}
+  .warn::before{content:"WARNING: ";font-weight:700}
+  .info{background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.12);border-radius:12px;padding:14px 18px;margin:16px 0;font-size:13px;color:#818cf8}
+  [data-theme="light"] .info{color:#4f46e5}
+  .info::before{content:"INFO: ";font-weight:700}
+
+  .file-tree{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;font-family:'SF Mono',Monaco,monospace;font-size:13px;color:var(--text2);margin:16px 0;transition:var(--transition)}
+  .file-tree .dir{color:var(--accent);font-weight:600}
+  .file-tree .file{color:var(--text)}
+  .file-tree .desc{color:var(--text3);font-style:italic}
+
+  .corner-brand{position:fixed;bottom:calc(12px + var(--safe-b));right:12px;z-index:40;background:var(--surface);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:10px;color:var(--text3);display:flex;align-items:center;gap:5px;box-shadow:0 4px 16px rgba(0,0,0,.1);transition:var(--transition)}
+  @media(min-width:640px){.corner-brand{bottom:16px;right:16px;padding:8px 14px;font-size:11px;border-radius:12px}}
+
+  @media(max-width:700px){
+    .hero h1{font-size:24px}
+    .flow{flex-direction:column}
+    .flow-arrow{transform:rotate(90deg)}
+    .stats{grid-template-columns:1fr 1fr}
+    .section pre{font-size:11px;padding:12px}
+    .diagram pre{font-size:10px}
+    .file-tree{font-size:11px;padding:12px}
+    .toc-grid{grid-template-columns:1fr}
+    table{font-size:12px}
+    th,td{padding:8px 10px}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <a href="/" style="text-decoration:none"><div class="topbar-logo">&#9729;</div></a>
+    <div class="topbar-title">Documentation</div>
+  </div>
+  <div class="topbar-right">
+    <a href="/">Dashboard</a>
+    <a href="/setup">Setup</a>
+    <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">&#9790;</button>
+  </div>
+</div>
+
+<div class="hero">
+  <h1><span>Cloudflare</span> Tunnel Portal</h1>
+  <p>One-click port forwarding to your own subdomain. OAuth-powered. No API tokens needed.</p>
+  <div class="badge">v2.0.0</div>
+</div>
+
+<div class="container">
+  <div class="toc">
+    <h3>Table of Contents</h3>
+    <div class="toc-grid">
+      <a href="#overview">1. Overview</a>
+      <a href="#architecture">2. Architecture</a>
+      <a href="#oauth-flow">3. OAuth + MCP Flow</a>
+      <a href="#how-it-works">4. How It Works</a>
+      <a href="#setup">5. First-Time Setup</a>
+      <a href="#creating-tunnels">6. Creating Tunnels</a>
+      <a href="#managing">7. Managing Tunnels</a>
+      <a href="#api">8. API Reference</a>
+      <a href="#config">9. Configuration</a>
+      <a href="#security">10. Security</a>
+      <a href="#troubleshooting">11. Troubleshooting</a>
+      <a href="#cli">12. CLI</a>
+      <a href="#api-keys">13. API Keys</a>
+      <a href="#faq">14. FAQ</a>
+    </div>
+  </div>
+
+  <div class="section" id="overview">
+    <h2>1. Overview</h2>
+    <p>Cloudflare Tunnel Portal is a self-hosted web application that exposes local services to the internet through Cloudflare Tunnels. Cross-platform: Linux, macOS, Windows, and Termux. Just enter a port and subdomain, and the system handles everything else automatically.</p>
+    <div class="stats">
+      <div class="stat"><div class="num">0</div><div class="label">API Tokens Needed</div></div>
+      <div class="stat"><div class="num">1</div><div class="label">Click to Deploy</div></div>
+      <div class="stat"><div class="num">5-10s</div><div class="label">Deploy Time</div></div>
+      <div class="stat"><div class="num">4</div><div class="label">Platforms</div></div>
+    </div>
+    <h3>Key Features</h3>
+    <ul>
+      <li><strong>Cross-Platform</strong> - Linux, macOS, Windows, Termux. One installer, one command.</li>
+      <li><strong>OAuth 2.1 Authentication</strong> - One-click Cloudflare authorization, no API tokens to manage</li>
+      <li><strong>MCP Integration</strong> - All API calls go through Cloudflare's Model Context Protocol server</li>
+      <li><strong>GUI Command</strong> - <code>porter gui</code> opens the dashboard in your browser instantly</li>
+      <li><strong>Real-Time Progress</strong> - SSE-powered step-by-step progress during tunnel creation</li>
+      <li><strong>Auto Port Detection</strong> - Scans your system for running services (cross-platform)</li>
+      <li><strong>Passcode Protected</strong> - SHA-256 hashed passcode secures the portal</li>
+      <li><strong>Clean Dashboard</strong> - Copy URLs, stop tunnels, monitor everything</li>
+    </ul>
+  </div>
+
+  <div class="section" id="architecture">
+    <h2>2. Architecture</h2>
+    <p>The portal uses Cloudflare's MCP (Model Context Protocol) server for all API interactions. This eliminates the need for manual API token management.</p>
+    <div class="diagram">
+<pre>
+<span class="highlight">+---------------------------------------------------------+</span>
+<span class="highlight">|           CLOUDFLARE TUNNEL PORTAL (v2.0)                </span>
+<span class="highlight">+---------------------------------------------------------+</span>
+<span class="dim">|                                                         </span>
+<span class="dim">|  +-----------+   +-----------+   +-------------------+  </span>
+<span class="highlight">|  |  Web UI   |-->|  Flask API |-->| cloudflared (proc) |  </span>
+<span class="dim">|  | (HTML/JS) |   |  (Python)  |   | tunnel --token     |  </span>
+<span class="dim">|  +-----------+   +-----+-----+   +--------+----------+  </span>
+<span class="dim">|                    |                       |             </span>
+<span class="dim">|                    v                       |             </span>
+<span class="dim">|            +--------------+                 |             </span>
+<span class="highlight">|            | OAuth 2.1 +  |                 |             </span>
+<span class="highlight">|            | PKCE tokens  |                 |             </span>
+<span class="dim">|            +------+-------+                 |             </span>
+<span class="dim">|                   |                         |             </span>
+<span class="dim">|                   v                         v             </span>
+<span class="dim">|  +----------------------------------------------------+  </span>
+<span class="dim">|  |                 Cloudflare MCP Server                |  </span>
+<span class="highlight">|  |  mcp.cloudflare.com  -  OAuth  -  Code Mode  -  REST |  </span>
+<span class="dim">|  +----------------------------------------------------+  </span>
+<span class="highlight">+---------------------------------------------------------+</span>
+</pre>
+    </div>
+  </div>
+
+  <div class="section" id="oauth-flow">
+    <h2>3. OAuth + MCP Flow</h2>
+    <p>The portal uses OAuth 2.1 with PKCE (Proof Key for Code Exchange) to securely authorize against Cloudflare's MCP server.</p>
+    <div class="flow">
+      <div class="flow-step"><div class="icon">1</div><div class="label">Click "Connect"</div></div>
+      <div class="flow-arrow">-></div>
+      <div class="flow-step"><div class="icon">2</div><div class="label">Client registration</div></div>
+      <div class="flow-arrow">-></div>
+      <div class="flow-step"><div class="icon">3</div><div class="label">Cloudflare login</div></div>
+      <div class="flow-arrow">-></div>
+      <div class="flow-step"><div class="icon">4</div><div class="label">User authorizes</div></div>
+      <div class="flow-arrow">-></div>
+      <div class="flow-step"><div class="icon">5</div><div class="label">Token exchange</div></div>
+    </div>
+    <div class="warn">The <code>execute</code> tool requires: <code>async () => { ... }</code>. Top-level declarations cause parse errors.</div>
+  </div>
+
+  <div class="section" id="how-it-works">
+    <h2>4. How It Works</h2>
+    <div class="flow">
+      <div class="flow-step"><div class="icon">1</div><div class="label">Check DNS</div></div>
+      <div class="flow-arrow">-></div>
+      <div class="flow-step"><div class="icon">2</div><div class="label">Setup Tunnel</div></div>
+      <div class="flow-arrow">-></div>
+      <div class="flow-step"><div class="icon">3</div><div class="label">Add Hostname</div></div>
+      <div class="flow-arrow">-></div>
+      <div class="flow-step"><div class="icon">4</div><div class="label">Create DNS</div></div>
+      <div class="flow-arrow">-></div>
+      <div class="flow-step"><div class="icon">5</div><div class="label">Start cloudflared</div></div>
+    </div>
+    <h3>Step Details</h3>
+    <ol>
+      <li><strong>DNS Cleanup</strong> - Checks for existing DNS records and removes conflicts</li>
+      <li><strong>Tunnel Setup</strong> - Creates or reuses a Cloudflare tunnel</li>
+      <li><strong>Hostname Configuration</strong> - Adds subdomain to tunnel ingress rules</li>
+      <li><strong>DNS Record</strong> - Creates CNAME: subdomain.domain -> tunnel_id.cfargotunnel.com</li>
+      <li><strong>Start cloudflared</strong> - Retrieves tunnel token and spawns process</li>
+    </ol>
+  </div>
+
+  <div class="section" id="setup">
+    <h2>5. First-Time Setup</h2>
+    <h3>One-Line Install (Recommended)</h3>
+    <pre><code># Linux, macOS, Windows (Git Bash/WSL), Termux
+curl -fsSL https://tinyurl.com/2ctqvyfp | bash
+
+# Windows PowerShell (two-step, most reliable)
+curl.exe -fsSL https://tinyurl.com/2ctqvyfp -o install.sh
+bash install.sh</code></pre>
+    <p>The installer auto-detects your platform, installs Python, pip, cloudflared, and all dependencies.</p>
+    <h3>Manual Install</h3>
+    <pre><code># 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Ensure cloudflared is installed
+which cloudflared || {
+  curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+    -o /usr/local/bin/cloudflared
+  chmod +x /usr/local/bin/cloudflared
+}
+
+# 3. Install CLI
+pip install -e .
+
+# 4. Start and open dashboard
+porter gui</code></pre>
+    <div class="info">The OAuth flow uses dynamic client registration - no pre-registered app needed.</div>
+  </div>
+
+  <div class="section" id="creating-tunnels">
+    <h2>6. Creating Tunnels</h2>
+    <ol>
+      <li>Login with your passcode</li>
+      <li>Dashboard shows detected running ports</li>
+      <li>Enter a subdomain name (e.g., <code>myapp</code>)</li>
+      <li>Select the port from the dropdown</li>
+      <li>Click <strong>"Launch"</strong></li>
+      <li>Watch real-time progress</li>
+      <li>Service is live at <code>https://myapp.yourdomain.com</code></li>
+    </ol>
+  </div>
+
+  <div class="section" id="managing">
+    <h2>7. Managing Tunnels</h2>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Feature</th><th>Description</th></tr>
+      <tr><td><strong>Copy URL</strong></td><td>One-click copy of the public URL</td></tr>
+      <tr><td><strong>Stop</strong></td><td>Kills tunnel process, removes DNS record, removes hostname</td></tr>
+    </table>
+    </div>
+  </div>
+
+  <div class="section" id="api">
+    <h2>8. API Reference</h2>
+    <h3>Port Scanning</h3>
+    <pre><code>GET /api/ports/scan
+# Response: { "open_ports": [4000, 7262, 8080] }</code></pre>
+    <h3>Create Tunnel (SSE)</h3>
+    <pre><code>POST /api/tunnel/create/stream
+Content-Type: application/json
+{ "subdomain": "myapp", "port": 8080 }
+# Response: text/event-stream with step-by-step progress</code></pre>
+    <h3>Stop Tunnel</h3>
+    <pre><code>POST /api/tunnel/stop/{key}
+# Response: { "success": true, "message": "Tunnel stopped" }</code></pre>
+  </div>
+
+  <div class="section" id="config">
+    <h2>9. Configuration</h2>
+    <div class="file-tree">
+<span class="dir">cloudflare/</span>
+  <span class="file">app.py</span>              <span class="desc"># Flask application</span>
+  <span class="file">cloudflare_client.py</span> <span class="desc"># OAuth + MCP client</span>
+  <span class="file">tunnel_manager.py</span>    <span class="desc"># Single-process cloudflared</span>
+  <span class="file">api_keys.py</span>          <span class="desc"># API key management</span>
+  <span class="file">config.json</span>         <span class="desc"># Passcode hash, domain</span>
+  <span class="file">tokens.json</span>         <span class="desc"># OAuth tokens</span>
+  <span class="file">tunnels.json</span>        <span class="desc"># Active tunnels</span>
+  <span class="dir">porter/</span>               <span class="desc"># Cross-platform CLI</span>
+    <span class="file">cli.py</span>            <span class="desc"># Main CLI entry point</span>
+    <span class="file">platform.py</span>       <span class="desc"># OS detection &amp; shell abstractions</span>
+    <span class="file">server.py</span>         <span class="desc"># Server lifecycle manager</span>
+    <span class="file">cloudflare.py</span>     <span class="desc"># CLI OAuth flow</span>
+    <span class="file">api.py</span>            <span class="desc"># HTTP client</span>
+    <span class="file">config.py</span>         <span class="desc"># CLI config (~/.porter/)</span>
+    <span class="file">output.py</span>         <span class="desc"># Colored terminal output</span>
+  <span class="dir">templates/</span>
+    <span class="file">dashboard.html</span>     <span class="desc"># Main UI</span>
+    <span class="file">setup.html</span>         <span class="desc"># Setup wizard</span>
+    <span class="file">login.html</span>         <span class="desc"># Passcode entry</span>
+    <span class="file">docs.html</span>          <span class="desc"># This page</span>
+    </div>
+  </div>
+
+  <div class="section" id="security">
+    <h2>10. Security</h2>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Aspect</th><th>Old (API Token)</th><th>New (OAuth + MCP)</th></tr>
+      <tr><td>Token Scope</td><td>Broad API access</td><td>Scoped to MCP server</td></tr>
+      <tr><td>Rotation</td><td>Manual</td><td>Automatic (refresh token)</td></tr>
+      <tr><td>Storage</td><td>Plain text in config</td><td>Managed by MCP server</td></tr>
+    </table>
+    </div>
+    <h3>Best Practices</h3>
+    <ul>
+      <li>Restrict portal access with firewall rules</li>
+      <li>Use HTTPS reverse proxy for the portal</li>
+      <li>Choose a strong passcode</li>
+      <li>Monitor <code>portal.log</code> for unauthorized access</li>
+    </ul>
+  </div>
+
+  <div class="section" id="troubleshooting">
+    <h2>11. Troubleshooting</h2>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Problem</th><th>Cause</th><th>Solution</th></tr>
+      <tr><td>"Not connected"</td><td>Tokens expired/missing</td><td>Setup -> Connect Cloudflare</td></tr>
+      <tr><td>"Subdomain in use"</td><td>DNS record exists</td><td>Stop existing tunnel</td></tr>
+      <tr><td>"cloudflared not found"</td><td>Binary not installed</td><td>Install cloudflared</td></tr>
+      <tr><td>Port not in dropdown</td><td>Service not running</td><td>Start service, refresh</td></tr>
+    </table>
+    </div>
+    <pre><code># Portal logs
+tail -f portal.log
+
+# cloudflared output
+tail -f tunnel.log
+
+# Running processes
+ps aux | grep -E "python3|cloudflared"</code></pre>
+  </div>
+
+  <div class="section" id="cli">
+    <h2>12. CLI (Porter Command)</h2>
+    <p>Porter includes a cross-platform CLI for managing everything from the terminal. Works on Linux, macOS, Windows, and Termux.</p>
+    <h3>Install CLI</h3>
+    <pre><code>cd porter
+pip install -e .
+
+# Verify installation
+porter --help</code></pre>
+    <h3>Commands</h3>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Command</th><th>Description</th></tr>
+      <tr><td><code>porter gui</code></td><td>Open the web dashboard in your browser</td></tr>
+      <tr><td><code>porter platform</code></td><td>Show platform info (OS, arch, available tools)</td></tr>
+      <tr><td><code>porter server start|stop|restart|status</code></td><td>Manage the server process</td></tr>
+      <tr><td><code>porter server logs --follow</code></td><td>Tail logs in real time</td></tr>
+      <tr><td><code>porter cf connect</code></td><td>Connect Cloudflare account (OAuth from terminal)</td></tr>
+      <tr><td><code>porter cf status</code></td><td>Check Cloudflare connection</td></tr>
+      <tr><td><code>porter tunnels</code></td><td>List active tunnels</td></tr>
+      <tr><td><code>porter tunnel create &lt;sub&gt; &lt;port&gt;</code></td><td>Create a tunnel</td></tr>
+      <tr><td><code>porter tunnel stop &lt;sub&gt;</code></td><td>Stop a tunnel</td></tr>
+      <tr><td><code>porter ports</code></td><td>List listening ports</td></tr>
+      <tr><td><code>porter keys create &lt;name&gt;</code></td><td>Create API key</td></tr>
+      <tr><td><code>porter setup</code></td><td>Setup wizard</td></tr>
+    </table>
+    </div>
+    <h3>Examples</h3>
+    <pre><code># Open dashboard
+porter gui
+
+# Connect Cloudflare from terminal
+porter cf connect
+
+# Create a tunnel
+porter tunnel create panel 7262
+
+# Check platform info
+porter platform
+
+# List listening ports
+porter ports
+
+# Create an API key
+porter keys create my-script
+
+# Watch logs
+porter server logs --follow</code></pre>
+  </div>
+
+  <div class="section" id="api-keys">
+    <h2>13. API Keys</h2>
+    <p>API keys allow programmatic access without using the passcode directly.</p>
+    <h3>Authentication</h3>
+    <p>Pass API keys via the <code>X-API-Key</code> header:</p>
+    <pre><code>curl -H "X-API-Key: pk_..." http://localhost:7262/api/tunnels</code></pre>
+    <h3>Endpoints</h3>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+      <tr><td><code>GET</code></td><td><code>/api/keys</code></td><td>List all API keys</td></tr>
+      <tr><td><code>POST</code></td><td><code>/api/keys</code></td><td>Create API key</td></tr>
+      <tr><td><code>DELETE</code></td><td><code>/api/keys/&lt;id&gt;</code></td><td>Delete API key</td></tr>
+      <tr><td><code>POST</code></td><td><code>/api/keys/&lt;id&gt;/rotate</code></td><td>Rotate API key</td></tr>
+    </table>
+    </div>
+    <h3>Create via API</h3>
+    <pre><code>curl -X POST http://localhost:7262/api/keys \
+  -H "Content-Type: application/json" \
+  -H "X-Passcode: your_passcode" \
+  -d '{"name": "my-script"}'</code></pre>
+  </div>
+
+  <div class="section" id="faq">
+    <h2>14. FAQ</h2>
+    <h3>Can I use this with any Cloudflare plan?</h3>
+    <p>Yes. Free, Pro, Business, and Enterprise all work.</h3>
+    <h3>What happens if I restart my VPS?</h3>
+    <p>Tunnels stop. Recreate them through the portal or CLI.</p>
+    <h3>Why OAuth instead of API tokens?</h3>
+    <p>No token management, automatic rotation, scoped access.</p>
+    <h3>Does it work on Windows?</h3>
+    <p>Yes. Git Bash, WSL, and MSYS2 are supported. Native Windows uses PowerShell commands.</p>
+    <h3>Does it work on Android?</h3>
+    <p>Yes. Termux is fully supported with auto-installed cloudflared.</p>
+    <h3>How do I open the dashboard?</h3>
+    <p>Run <code>porter gui</code> from the terminal. It opens the dashboard in your default browser.</p>
+  </div>
+</div>
+
+<div class="corner-brand">
+  Built by <span class="dot"></span> <a href="https://Tect0nic.com" target="_blank" rel="noopener">Tect0nic</a>
+</div>
+
+<script>
+const savedTheme = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', savedTheme);
+document.getElementById('themeBtn').textContent = savedTheme === 'dark' ? '\u263C' : '\u263E';
+function toggleTheme() { const html = document.documentElement; const cur = html.getAttribute('data-theme'); const next = cur === 'dark' ? 'light' : 'dark'; html.setAttribute('data-theme', next); localStorage.setItem('theme', next); document.getElementById('themeBtn').textContent = next === 'dark' ? '\u263C' : '\u263E'; }
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw.js').catch(() => {}); }
+</script>
+</body>
+</html>

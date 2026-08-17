@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f6821f">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<title>Tunnel Portal - Expose Local Services to the Internet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,sans-serif;--accent:#f6821f;--accent2:#e65c00;--green:#22c55e;--transition:all .25s ease;--safe-b:env(safe-area-inset-bottom,0px)}
+  [data-theme="dark"]{--bg:#06060e;--surface:rgba(14,14,24,.65);--surface2:rgba(255,255,255,.03);--border:rgba(255,255,255,.05);--text:#e8e8ec;--text2:#888;--text3:#555;--text4:#333}
+  [data-theme="light"]{--bg:#f8f8fb;--surface:rgba(255,255,255,.9);--surface2:rgba(0,0,0,.02);--border:rgba(0,0,0,.06);--text:#1a1a2e;--text2:#555;--text3:#999;--text4:#ccc}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
+
+  .bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .bg-orb{position:absolute;border-radius:50%;filter:blur(140px);opacity:.05}
+  .bg-orb-1{width:800px;height:800px;background:var(--accent);top:-300px;left:-200px;animation:orbFloat 40s ease-in-out infinite}
+  .bg-orb-2{width:600px;height:600px;background:#6366f1;bottom:-300px;right:-200px;animation:orbFloat 35s ease-in-out infinite reverse}
+  @keyframes orbFloat{0%,100%{transform:translate(0,0)}33%{transform:translate(30px,-40px)}66%{transform:translate(-20px,30px)}}
+  .grid-overlay{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:60px 60px;opacity:.3}
+
+  /* Nav */
+  .nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:color-mix(in srgb,var(--bg) 70%,transparent);border-bottom:1px solid var(--border)}
+  @media(min-width:640px){.nav{padding:16px 32px}}
+  .nav-left{display:flex;align-items:center;gap:10px}
+  .nav-logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:16px;color:#000;font-weight:900}
+  .nav-brand{font-size:14px;font-weight:800;letter-spacing:-.3px}
+  .nav-right{display:flex;align-items:center;gap:10px}
+  .nav-link{color:var(--text3);text-decoration:none;font-size:13px;font-weight:500;transition:color .2s;padding:8px}
+  .nav-cta{padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;transition:var(--transition)}
+  .nav-cta:active{transform:scale(.97)}
+  .theme-toggle{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:var(--transition);flex-shrink:0}
+  .theme-toggle:active{transform:scale(.95)}
+
+  /* Hero */
+  .hero{position:relative;z-index:1;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;text-align:center;padding:100px 20px 60px;padding-top:calc(100px + var(--safe-b))}
+  .hero-content{max-width:700px;width:100%}
+  .hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);font-size:11px;font-weight:600;color:var(--text2);margin-bottom:24px;backdrop-filter:blur(10px)}
+  .hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+  .hero h1{font-size:clamp(32px,8vw,64px);font-weight:900;letter-spacing:-.03em;line-height:1.05;margin-bottom:20px}
+  .hero h1 .gradient{background:linear-gradient(135deg,var(--accent),#fb923c,var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .hero p{font-size:clamp(14px,3vw,18px);color:var(--text2);max-width:480px;margin:0 auto 32px;line-height:1.6}
+  .hero-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{padding:14px 24px;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;transition:var(--transition);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font);border:none;min-height:48px}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;box-shadow:0 4px 20px rgba(246,130,31,.3);width:100%}
+  @media(min-width:400px){.btn-primary{width:auto}}
+  .btn-primary:active{transform:scale(.97)}
+  .btn-secondary{background:var(--surface);border:1px solid var(--border);color:var(--text);backdrop-filter:blur(10px);flex:1}
+  @media(min-width:400px){.btn-secondary{flex:none}}
+  .btn-secondary:active{transform:scale(.97)}
+
+  .hero-visual{margin-top:48px}
+  .hero-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;max-width:500px;margin:0 auto;backdrop-filter:blur(40px);box-shadow:0 16px 64px rgba(0,0,0,.3)}
+  @media(min-width:640px){.hero-card{padding:24px;border-radius:20px}}
+  .hero-card-header{display:flex;align-items:center;gap:6px;margin-bottom:12px}
+  .hero-card-dot{width:6px;height:6px;border-radius:50%;background:var(--text4)}
+  .hero-card-dot:nth-child(1){background:#ef4444}
+  .hero-card-dot:nth-child(2){background:#fbbf24}
+  .hero-card-dot:nth-child(3){background:#22c55e}
+  .hero-card-bar{flex:1;height:28px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;padding:0 10px;font-size:10px;color:var(--text3);font-family:'SF Mono',Monaco,monospace;border:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media(min-width:640px){.hero-card-bar{height:32px;font-size:12px;padding:0 12px}}
+  .hero-card-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  @media(min-width:640px){.hero-card-steps{gap:8px}}
+  .hero-step{padding:10px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;text-align:center}
+  @media(min-width:640px){.hero-step{padding:12px 8px;border-radius:12px}}
+  .hero-step-num{font-size:16px;font-weight:800;color:var(--accent);margin-bottom:2px}
+  @media(min-width:640px){.hero-step-num{font-size:20px}}
+  .hero-step-label{font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px}
+  @media(min-width:640px){.hero-step-label{font-size:10px}}
+
+  /* Features */
+  .features{position:relative;z-index:1;padding:60px 16px 80px;max-width:1200px;margin:0 auto}
+  @media(min-width:640px){.features{padding:100px 24px}}
+  .section-label{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;text-align:center}
+  .section-title{font-size:clamp(24px,5vw,36px);font-weight:800;text-align:center;margin-bottom:12px;letter-spacing:-.02em}
+  .section-desc{font-size:14px;color:var(--text2);text-align:center;max-width:440px;margin:0 auto 40px;line-height:1.6}
+  .features-grid{display:grid;grid-template-columns:1fr;gap:12px}
+  @media(min-width:640px){.features-grid{grid-template-columns:repeat(2,1fr);gap:16px}}
+  @media(min-width:960px){.features-grid{grid-template-columns:repeat(3,1fr)}}
+  .feature-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;transition:var(--transition);position:relative;overflow:hidden}
+  @media(min-width:640px){.feature-card{border-radius:20px;padding:32px}}
+  .feature-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;transition:opacity .3s}
+  .feature-card:active{transform:scale(.98)}
+  .feature-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 10%,transparent),color-mix(in srgb,var(--accent) 5%,transparent));border:1px solid color-mix(in srgb,var(--accent) 15%,var(--border));display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px}
+  @media(min-width:640px){.feature-icon{width:48px;height:48px;border-radius:14px;font-size:22px;margin-bottom:20px}}
+  .feature-card h3{font-size:15px;font-weight:700;margin-bottom:6px;letter-spacing:-.2px}
+  @media(min-width:640px){.feature-card h3{font-size:17px}}
+  .feature-card p{font-size:13px;color:var(--text2);line-height:1.6}
+  @media(min-width:640px){.feature-card p{font-size:14px}}
+
+  /* Stats */
+  .stats{position:relative;z-index:1;padding:40px 16px 60px;max-width:900px;margin:0 auto}
+  .stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  @media(min-width:640px){.stats-grid{grid-template-columns:repeat(4,1fr);gap:16px}}
+  .stat-card{text-align:center;padding:24px 12px;background:var(--surface);border:1px solid var(--border);border-radius:14px}
+  @media(min-width:640px){.stat-card{padding:32px 16px;border-radius:16px}}
+  .stat-num{font-size:28px;font-weight:900;color:var(--accent);letter-spacing:-.02em}
+  @media(min-width:640px){.stat-num{font-size:36px}}
+  .stat-label{font-size:11px;color:var(--text3);margin-top:4px}
+  @media(min-width:640px){.stat-label{font-size:13px}}
+
+  /* CTA */
+  .cta{position:relative;z-index:1;padding:60px 16px 80px;text-align:center}
+  .cta-box{max-width:500px;margin:0 auto;padding:40px 24px;background:var(--surface);border:1px solid var(--border);border-radius:20px;backdrop-filter:blur(40px);position:relative;overflow:hidden}
+  @media(min-width:640px){.cta-box{padding:60px 40px;border-radius:24px}}
+  .cta-box::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at center,color-mix(in srgb,var(--accent) 6%,transparent) 0%,transparent 60%);pointer-events:none}
+  .cta-box h2{font-size:clamp(22px,4vw,28px);font-weight:800;margin-bottom:10px;letter-spacing:-.3px;position:relative}
+  .cta-box p{font-size:14px;color:var(--text2);margin-bottom:24px;position:relative}
+  .cta-box .btn{position:relative}
+
+  /* Footer */
+  .footer{position:relative;z-index:1;padding:24px 16px calc(24px + var(--safe-b));border-top:1px solid var(--border)}
+  .footer-content{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:12px;align-items:center}
+  @media(min-width:640px){.footer-content{flex-direction:row;justify-content:space-between}}
+  .footer-brand{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3)}
+  .footer-brand .dot{width:3px;height:3px;border-radius:50%;background:var(--text3);opacity:.4}
+  .footer-brand a{color:var(--accent);text-decoration:none;font-weight:600}
+  .footer-links{display:flex;gap:16px}
+  .footer-links a{color:var(--text3);text-decoration:none;font-size:12px;transition:color .2s}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .hero-content{animation:fadeUp .8s ease-out}
+  .hero-card{animation:fadeUp .8s ease-out .2s both}
+</style>
+</head>
+<body>
+<div class="bg">
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+</div>
+<div class="grid-overlay"></div>
+
+<nav class="nav">
+  <div class="nav-left">
+    <div class="nav-logo">&#9729;</div>
+    <span class="nav-brand">Tunnel Portal</span>
+  </div>
+  <div class="nav-right">
+    <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">&#9790;</button>
+    <a href="/login" class="nav-link">Login</a>
+    <a href="/login" class="nav-cta">Get Started</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-badge"><span class="dot"></span> Powered by Cloudflare Tunnels</div>
+    <h1>Expose any local service to the <span class="gradient">internet</span></h1>
+    <p>One-click port forwarding to your own subdomain. No API tokens. No complex setup.</p>
+    <div class="hero-actions">
+      <a href="/login" class="btn btn-primary">Get Started Free</a>
+      <a href="/docs" class="btn btn-secondary">Docs</a>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-card">
+        <div class="hero-card-header">
+          <div class="hero-card-dot"></div>
+          <div class="hero-card-dot"></div>
+          <div class="hero-card-dot"></div>
+          <div class="hero-card-bar">https://myapp.yourdomain.com</div>
+        </div>
+        <div class="hero-card-steps">
+          <div class="hero-step"><div class="hero-step-num">01</div><div class="hero-step-label">Port</div></div>
+          <div class="hero-step"><div class="hero-step-num">02</div><div class="hero-step-label">Subdomain</div></div>
+          <div class="hero-step"><div class="hero-step-num">03</div><div class="hero-step-label">Launch</div></div>
+          <div class="hero-step"><div class="hero-step-num">04</div><div class="hero-step-label">Live</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <div class="section-label">Features</div>
+  <div class="section-title">Everything you need</div>
+  <div class="section-desc">No infrastructure knowledge required.</div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">&#9889;</div>
+      <h3>One-Click Deploy</h3>
+      <p>Enter a port and subdomain. The portal handles DNS, tunnels, and SSL automatically.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128274;</div>
+      <h3>OAuth Authentication</h3>
+      <p>Secure Cloudflare authorization. No API tokens to manage or worry about leaking.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128640;</div>
+      <h3>Real-Time Progress</h3>
+      <p>Watch each step as it happens with live progress tracking.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#127760;</div>
+      <h3>Multi-Domain</h3>
+      <p>Manage multiple Cloudflare domains from one portal.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128270;</div>
+      <h3>Auto Port Detection</h3>
+      <p>Scans your system for running services automatically.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128187;</div>
+      <h3>Self-Hosted</h3>
+      <p>Run on your own VPS. Full control over your data.</p>
+    </div>
+  </div>
+</section>
+
+<section class="stats">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-num">0</div><div class="stat-label">API Tokens</div></div>
+    <div class="stat-card"><div class="stat-num">5s</div><div class="stat-label">Deploy Time</div></div>
+    <div class="stat-card"><div class="stat-num">100%</div><div class="stat-label">Encrypted</div></div>
+    <div class="stat-card"><div class="stat-num">1</div><div class="stat-label">Click Setup</div></div>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="cta-box">
+    <h2>Ready to go live?</h2>
+    <p>Set up in under 2 minutes.</p>
+    <a href="/login" class="btn btn-primary">Start Now</a>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer-content">
+    <div class="footer-brand">Built by <span class="dot"></span> <a href="https://Tect0nic.com" target="_blank" rel="noopener">Tect0nic</a></div>
+    <div class="footer-links">
+      <a href="/docs">Docs</a>
+      <a href="/login">Login</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+const savedTheme=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',savedTheme);document.getElementById('themeBtn').textContent=savedTheme==='dark'?'\u263C':'\u263E';
+function toggleTheme(){const h=document.documentElement,c=h.getAttribute('data-theme'),n=c==='dark'?'light':'dark';h.setAttribute('data-theme',n);localStorage.setItem('theme',n);document.getElementById('themeBtn').textContent=n==='dark'?'\u263C':'\u263E'}
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw.js').catch(() => {}); }
+</script>
+</body>
+</html>

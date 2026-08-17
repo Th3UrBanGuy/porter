@@ -1,0 +1,20 @@
+# Secrets & tokens
+config.json
+tokens.json
+tunnels.json
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

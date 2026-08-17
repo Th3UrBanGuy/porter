@@ -1,0 +1,4 @@
+flask>=3.0
+httpx>=0.25
+gunicorn>=21.0
+gevent>=23.0

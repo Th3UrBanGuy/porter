@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Porter by Tectonic — Cloudflare Tunnel Portal</title>
+<meta name="description" content="Self-hosted Cloudflare Tunnel portal by Tectonic. Expose any local service to the internet in seconds. Cross-platform: Linux, macOS, Windows, Termux.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9729;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,sans-serif;--accent:#f6821f;--accent2:#e65c00;--transition:all .25s ease;--safe-b:env(safe-area-inset-bottom,0px)}
+  [data-theme="dark"]{--bg:#06060e;--surface:rgba(14,14,24,.65);--surface2:rgba(255,255,255,.03);--border:rgba(255,255,255,.05);--text:#e8e8ec;--text2:#aaa;--text3:#666;--code-bg:rgba(255,255,255,.04);--green:#22c55e;--red:#ef4444;--indigo:#6366f1}
+  [data-theme="light"]{--bg:#f4f4f7;--surface:rgba(255,255,255,.85);--surface2:rgba(0,0,0,.02);--border:rgba(0,0,0,.06);--text:#1a1a2e;--text2:#555;--text3:#999;--code-bg:rgba(0,0,0,.04);--green:#16a34a;--red:#dc2626;--indigo:#4f46e5}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;scroll-padding-top:80px}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+
+  /* ── Animated Background Orbs ── */
+  .bg-orbs{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+  .orb{position:absolute;border-radius:50%;filter:blur(120px);opacity:.12;animation:orbFloat 20s ease-in-out infinite}
+  .orb-1{width:600px;height:600px;background:var(--accent);top:-10%;left:-10%;animation-delay:0s}
+  .orb-2{width:500px;height:500px;background:var(--indigo);bottom:-10%;right:-10%;animation-delay:-7s}
+  .orb-3{width:400px;height:400px;background:var(--accent2);top:40%;left:50%;animation-delay:-14s}
+  @keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-40px) scale(1.05)}66%{transform:translate(-20px,30px) scale(.95)}}
+
+  /* ── Nav ── */
+  nav{position:fixed;top:0;left:0;right:0;z-index:200;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;transition:var(--transition)}
+  .nav-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;color:var(--text)}
+  .nav-logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:16px;color:#000;font-weight:800;box-shadow:0 2px 12px rgba(246,130,31,.25)}
+  .nav-links{display:flex;gap:6px;align-items:center}
+  .nav-links a{color:var(--text3);font-size:13px;padding:6px 12px;border-radius:8px;transition:all .2s;text-decoration:none}
+  .nav-links a:hover{color:var(--accent);background:var(--surface2)}
+  .nav-btn{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000!important;font-weight:600;padding:8px 16px;border-radius:10px;box-shadow:0 2px 12px rgba(246,130,31,.25)}
+  .nav-btn:hover{opacity:.9;text-decoration:none!important}
+  .theme-toggle{width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:var(--transition)}
+  .theme-toggle:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* ── Hero ── */
+  .hero{min-height:90vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:120px 20px 80px;position:relative}
+  .hero-content{max-width:700px;animation:fadeUp .8s ease}
+  .hero-badge{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:24px;backdrop-filter:blur(12px)}
+  .hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  .hero h1{font-size:clamp(36px,6vw,64px);font-weight:800;line-height:1.1;letter-spacing:-.03em;margin-bottom:20px}
+  .hero h1 .accent{color:var(--accent)}
+  .hero p{font-size:clamp(16px,2vw,20px);color:var(--text2);max-width:540px;margin:0 auto 32px}
+  .hero-buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{padding:12px 28px;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;transition:all .2s;text-decoration:none;border:none;font-family:var(--font)}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;box-shadow:0 4px 20px rgba(246,130,31,.3)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(246,130,31,.4);text-decoration:none}
+  .btn-ghost{background:var(--surface);border:1px solid var(--border);color:var(--text);backdrop-filter:blur(12px)}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent);text-decoration:none}
+
+  .hero-code{margin-top:40px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:inline-block;font-family:'SF Mono',Monaco,monospace;font-size:14px;color:var(--text);backdrop-filter:blur(12px);transition:var(--transition);position:relative}
+  .hero-code .prompt{color:var(--accent)}
+  .hero-code .cmd{color:var(--text)}
+  .hero-code .comment{color:var(--text3)}
+  .copy-btn{position:absolute;top:10px;right:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--text2);cursor:pointer;font-family:inherit;transition:var(--transition);display:flex;align-items:center;gap:5px}
+  .copy-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .copy-btn.copied{background:#16a34a;color:#fff;border-color:#16a34a}
+  .install-section pre{position:relative}
+  .install-section .copy-btn{top:12px;right:12px}
+
+  /* ── Sections ── */
+  section{padding:80px 20px}
+  .container{max-width:1100px;margin:0 auto}
+  .section-title{text-align:center;margin-bottom:60px}
+  .section-title h2{font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-.02em;margin-bottom:12px}
+  .section-title p{color:var(--text2);font-size:16px;max-width:500px;margin:0 auto}
+
+  /* ── Platform Grid ── */
+  .platforms{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:60px}
+  .platform-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;text-align:center;transition:var(--transition);backdrop-filter:blur(12px)}
+  .platform-card:hover{border-color:var(--accent);transform:translateY(-4px);box-shadow:0 8px 32px rgba(246,130,31,.1)}
+  .platform-icon{font-size:36px;margin-bottom:12px}
+  .platform-card h3{font-size:16px;font-weight:700;margin-bottom:6px}
+  .platform-card p{font-size:13px;color:var(--text2)}
+
+  /* ── Feature Grid ── */
+  .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+  .feature{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;transition:var(--transition);backdrop-filter:blur(12px)}
+  .feature:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .feature-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 15%,transparent),color-mix(in srgb,var(--indigo) 10%,transparent));display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px}
+  .feature h3{font-size:16px;font-weight:700;margin-bottom:8px}
+  .feature p{font-size:13px;color:var(--text2);line-height:1.6}
+
+  /* ── CLI Section ── */
+  .cli-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+  .cli-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;backdrop-filter:blur(12px);transition:var(--transition)}
+  .cli-card:hover{border-color:var(--accent)}
+  .cli-card h4{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+  .cli-cmd{font-family:'SF Mono',Monaco,monospace;font-size:13px;color:var(--text);margin-bottom:6px}
+  .cli-cmd .kw{color:var(--accent)}
+  .cli-desc{font-size:12px;color:var(--text3)}
+
+  /* ── Code Block ── */
+  pre{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;overflow-x:auto;margin:16px 0;font-family:'SF Mono',Monaco,monospace;font-size:13px;color:var(--text);backdrop-filter:blur(12px);transition:var(--transition)}
+  code{font-family:'SF Mono',Monaco,monospace;font-size:13px;background:var(--code-bg);padding:2px 7px;border-radius:5px;color:var(--accent)}
+  pre code{background:none;padding:0;color:var(--text)}
+
+  /* ── Stats ── */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin:40px 0}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center;backdrop-filter:blur(12px);transition:var(--transition)}
+  .stat:hover{border-color:var(--accent)}
+  .stat-num{font-size:32px;font-weight:800;color:var(--accent);line-height:1}
+  .stat-label{font-size:12px;color:var(--text3);margin-top:8px}
+
+  /* ── Architecture ── */
+  .arch{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;margin:40px 0;text-align:center;backdrop-filter:blur(12px)}
+  .arch pre{text-align:left;display:inline-block;background:none;border:none;padding:0;font-size:13px;line-height:1.6;color:var(--text3)}
+  .arch .hl{color:var(--accent)}
+  .arch .dim{color:var(--text3)}
+
+  /* ── Footer ── */
+  footer{text-align:center;padding:40px 20px 60px;border-top:1px solid var(--border);color:var(--text3);font-size:13px}
+  footer a{color:var(--accent)}
+
+  .corner-brand{position:fixed;bottom:calc(12px + var(--safe-b));right:12px;z-index:40;background:var(--surface);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:10px;color:var(--text3);display:flex;align-items:center;gap:5px;box-shadow:0 4px 16px rgba(0,0,0,.1);transition:var(--transition)}
+  @media(min-width:640px){.corner-brand{bottom:16px;right:16px;padding:8px 14px;font-size:11px;border-radius:12px}}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+
+  @media(max-width:700px){
+    nav{padding:10px 14px}
+    .nav-links a.hide-mobile{display:none}
+    section{padding:60px 16px}
+    .hero{min-height:auto;padding:100px 16px 60px}
+    .hero h1{font-size:32px}
+    .hero p{font-size:15px}
+    .hero-code{font-size:12px;padding:12px 14px;width:100%;overflow-x:auto}
+    .hero-code .cmd{word-break:break-all}
+    .features{grid-template-columns:1fr}
+    .platforms{grid-template-columns:1fr 1fr}
+    .cli-grid{grid-template-columns:1fr}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .arch pre{font-size:10px;overflow-x:auto}
+    .arch{padding:20px 12px}
+    .section-title h2{font-size:24px}
+    .btn{padding:10px 20px;font-size:13px}
+  }
+  @media(max-width:400px){
+    .platforms{grid-template-columns:1fr}
+    .hero-buttons{flex-direction:column;align-items:stretch}
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo">&#9729;</div>
+    <span>Porter</span>
+  </div>
+  <div class="nav-links">
+    <a href="#features" class="hide-mobile">Features</a>
+    <a href="#platforms" class="hide-mobile">Platforms</a>
+    <a href="#cli" class="hide-mobile">CLI</a>
+    <a href="https://github.com/Th3UrBanGuy/porter/tree/self-hosted" target="_blank">GitHub</a>
+    <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">&#9790;</button>
+  </div>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  HERO                                                       -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-badge"><span class="dot"></span> v2.0 &mdash; Cross-Platform</div>
+    <h1>Expose any service<br>to the <span class="accent">internet</span></h1>
+    <p>Self-hosted Cloudflare Tunnel portal. Enter a port, pick a subdomain, done. No DNS config, no API tokens, no hassle.</p>
+    <div class="hero-buttons">
+      <a href="https://github.com/Th3UrBanGuy/porter/tree/self-hosted" class="btn btn-primary" target="_blank">Get Started</a>
+      <a href="#features" class="btn btn-ghost">Learn More</a>
+    </div>
+    <div class="hero-code">
+      <button class="copy-btn" onclick="copyCmd(this, 'curl -fsSL https://tinyurl.com/2ctqvyfp | bash')">&#128203; Copy</button>
+      <span class="comment"># One-line install (Linux, macOS, Windows, Termux)</span><br>
+      <span class="prompt">$</span> <span class="cmd">curl -fsSL https://tinyurl.com/2ctqvyfp | bash</span>
+      <span style="color:#6b7280;font-size:13px;display:block;margin-top:4px">Windows: <code style="color:#f97316">curl.exe -fsSL ... -o install.sh && bash install.sh</code></span>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  PLATFORMS                                                   -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section id="platforms">
+  <div class="container">
+    <div class="section-title">
+      <h2>Works Everywhere</h2>
+      <p>One installer, one command. Runs on any platform with Python.</p>
+    </div>
+    <div class="platforms">
+      <div class="platform-card">
+        <div class="platform-icon">&#127987;</div>
+        <h3>Linux</h3>
+        <p>Debian, Ubuntu, RHEL, Fedora, Arch. Auto-detects package manager.</p>
+      </div>
+      <div class="platform-card">
+        <div class="platform-icon">&#127823;</div>
+        <h3>macOS</h3>
+        <p>Homebrew integration. Native ARM & Intel support.</p>
+      </div>
+      <div class="platform-card">
+        <div class="platform-icon">&#128187;</div>
+        <h3>Windows</h3>
+        <p>Git Bash, WSL, MSYS2. PowerShell commands. winget/choco/scoop.</p>
+      </div>
+      <div class="platform-card">
+        <div class="platform-icon">&#128241;</div>
+        <h3>Termux</h3>
+        <p>Android terminal. Full CLI support. Auto-installs cloudflared.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  FEATURES                                                    -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section id="features" style="background:var(--surface2)">
+  <div class="container">
+    <div class="section-title">
+      <h2>Everything You Need</h2>
+      <p>Built for developers who want fast, secure tunnel management.</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="stat-num">0</div><div class="stat-label">API Tokens</div></div>
+      <div class="stat"><div class="stat-num">1</div><div class="stat-label">Click Deploy</div></div>
+      <div class="stat"><div class="stat-num">5s</div><div class="stat-label">Deploy Time</div></div>
+      <div class="stat"><div class="stat-num">4</div><div class="stat-label">Platforms</div></div>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">&#128274;</div>
+        <h3>OAuth 2.1 + PKCE</h3>
+        <p>One-click Cloudflare authorization. No API tokens to manage. Automatic token rotation.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#9889;</div>
+        <h3>One-Click Deploy</h3>
+        <p>Enter a port, pick a subdomain, click Launch. Live in 5 seconds with real-time progress.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#128187;</div>
+        <h3>Full CLI</h3>
+        <p>Every feature accessible from terminal. <code>porter gui</code> opens the dashboard instantly.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#128272;</div>
+        <h3>Passcode Protected</h3>
+        <p>SHA-256 hashed passcode. API keys for programmatic access. Session-based auth.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#127760;</div>
+        <h3>Multi-Domain</h3>
+        <p>Supports multiple Cloudflare zones. Switch domains from the dashboard or CLI.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#128241;</div>
+        <h3>PWA Support</h3>
+        <p>Install as a native app on mobile or desktop. Works offline with service worker.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  CLI                                                         -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section id="cli">
+  <div class="container">
+    <div class="section-title">
+      <h2>Powerful CLI</h2>
+      <p>Every feature at your fingertips. Cross-platform, zero config.</p>
+    </div>
+
+    <div class="cli-grid">
+      <div class="cli-card">
+        <h4>GUI</h4>
+        <div class="cli-cmd"><span class="kw">porter gui</span></div>
+        <div class="cli-desc">Open the web dashboard in your browser</div>
+      </div>
+      <div class="cli-card">
+        <h4>Server</h4>
+        <div class="cli-cmd"><span class="kw">porter server</span> start|stop|restart|status</div>
+        <div class="cli-desc">Manage the Porter server process</div>
+      </div>
+      <div class="cli-card">
+        <h4>Cloudflare</h4>
+        <div class="cli-cmd"><span class="kw">porter cf</span> connect|status|disconnect</div>
+        <div class="cli-desc">OAuth flow from the terminal</div>
+      </div>
+      <div class="cli-card">
+        <h4>Tunnels</h4>
+        <div class="cli-cmd"><span class="kw">porter tunnel</span> create &lt;sub&gt; &lt;port&gt;</div>
+        <div class="cli-desc">Expose localhost to the internet</div>
+      </div>
+      <div class="cli-card">
+        <h4>API Keys</h4>
+        <div class="cli-cmd"><span class="kw">porter keys</span> create|delete|list</div>
+        <div class="cli-desc">Manage programmatic access keys</div>
+      </div>
+      <div class="cli-card">
+        <h4>Platform</h4>
+        <div class="cli-cmd"><span class="kw">porter platform</span></div>
+        <div class="cli-desc">Show OS, arch, available tools</div>
+      </div>
+    </div>
+
+    <pre><code># Quick start
+<span style="color:var(--accent)">$</span> porter gui                          <span style="color:var(--text3)"># Open dashboard</span>
+<span style="color:var(--accent)">$</span> porter cf connect                   <span style="color:var(--text3)"># Connect Cloudflare</span>
+<span style="color:var(--accent)">$</span> porter tunnel create panel 7262     <span style="color:var(--text3)"># panel.domain -> localhost:7262</span>
+<span style="color:var(--accent)">$</span> porter keys create github-action    <span style="color:var(--text3)"># Create CI/CD key</span>
+<span style="color:var(--accent)">$</span> porter server logs --follow         <span style="color:var(--text3)"># Watch logs</span></code></pre>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  ARCHITECTURE                                                -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section style="background:var(--surface2)">
+  <div class="container">
+    <div class="section-title">
+      <h2>Architecture</h2>
+      <p>Clean, minimal, secure. No database, no external dependencies.</p>
+    </div>
+
+    <div class="arch">
+<pre>
+<span class="hl">+---------------------------------------------------------+</span>
+<span class="hl">|           CLOUDFLARE TUNNEL PORTAL (v2.0)                </span>
+<span class="hl">+---------------------------------------------------------+</span>
+<span class="dim">|                                                         </span>
+<span class="dim">|  +-----------+   +-----------+   +-------------------+  </span>
+<span class="hl">|  |  Web UI   |-->|  Flask API |-->| cloudflared (proc) |  </span>
+<span class="dim">|  | (HTML/JS) |   |  (Python)  |   | tunnel --token     |  </span>
+<span class="dim">|  +-----------+   +-----+-----+   +--------+----------+  </span>
+<span class="dim">|                    |                       |             </span>
+<span class="dim">|                    v                       |             </span>
+<span class="dim">|            +--------------+                 |             </span>
+<span class="hl">|            | OAuth 2.1 +  |                 |             </span>
+<span class="hl">|            | PKCE tokens  |                 |             </span>
+<span class="dim">|            +------+-------+                 |             </span>
+<span class="dim">|                   |                         |             </span>
+<span class="dim">|                   v                         v             </span>
+<span class="dim">|  +----------------------------------------------------+  </span>
+<span class="dim">|  |                 Cloudflare MCP Server                |  </span>
+<span class="hl">|  |  mcp.cloudflare.com  -  OAuth  -  Code Mode  -  REST |  </span>
+<span class="dim">|  +----------------------------------------------------+  </span>
+<span class="hl">+---------------------------------------------------------+</span>
+</pre>
+    </div>
+
+    <div class="features" style="margin-top:40px">
+      <div class="feature">
+        <h3>No Database</h3>
+        <p>Flat JSON files. config.json, tunnels.json, tokens.json. Easy to backup, edit, version control.</p>
+      </div>
+      <div class="feature">
+        <h3>Single Process</h3>
+        <p>One cloudflared process per tunnel. Auto-detects and adopts existing processes on restart.</p>
+      </div>
+      <div class="feature">
+        <h3>MCP Integration</h3>
+        <p>All Cloudflare API calls go through their MCP server. No manual token management.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  INSTALL                                                     -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section id="install">
+  <div class="container">
+    <div class="section-title">
+      <h2>Install in Seconds</h2>
+      <p>One command. Everything handled automatically.</p>
+    </div>
+
+    <pre><button class="copy-btn" onclick="copyCmd(this, 'curl -fsSL https://tinyurl.com/2ctqvyfp | bash')">&#128203; Copy</button><code><span style="color:var(--text3)"># Linux, macOS, WSL, Termux</span>
+<span style="color:var(--accent)">$</span> curl -fsSL https://tinyurl.com/2ctqvyfp | bash
+
+<span style="color:var(--text3)"># Windows PowerShell (two-step, most reliable)</span>
+<span style="color:var(--accent)">$</span> curl.exe -fsSL https://tinyurl.com/2ctqvyfp -o install.sh
+<span style="color:var(--accent)">$</span> bash install.sh
+
+<span style="color:var(--text3)"># With custom port and passcode</span>
+<span style="color:var(--accent)">$</span> PORTER_PORT=8080 PORTER_PASSCODE=123456 curl -fsSL https://tinyurl.com/2ctqvyfp | bash
+
+<span style="color:var(--text3)"># Manual install</span>
+<span style="color:var(--accent)">$</span> git clone https://github.com/Th3UrBanGuy/porter.git
+<span style="color:var(--accent)">$</span> cd porter && pip install -r requirements.txt && pip install -e .
+<span style="color:var(--accent)">$</span> porter gui</code></pre>
+
+    <div class="stats">
+      <div class="stat"><div class="stat-num">~30s</div><div class="stat-label">Install Time</div></div>
+      <div class="stat"><div class="stat-num">Python</div><div class="stat-label">Only Dependency</div></div>
+      <div class="stat"><div class="stat-num">0</div><div class="stat-label">Manual Config</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  FOOTER                                                      -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<footer>
+  <p>Porter by <a href="https://Tect0nic.com" target="_blank" rel="noopener">Tectonic</a> &mdash; Open Source under MIT License</p>
+  <p style="margin-top:8px">
+    <a href="https://github.com/Th3UrBanGuy/porter/tree/self-hosted" target="_blank">GitHub</a> &middot;
+    <a href="https://github.com/Th3UrBanGuy/porter/tree/self-hosted#features" target="_blank">Docs</a> &middot;
+    <a href="https://Tect0nic.com" target="_blank">Tectonic</a>
+  </p>
+</footer>
+
+<div class="corner-brand">
+  Built by <span class="dot" style="width:5px;height:5px;border-radius:50%;background:var(--accent)"></span> <a href="https://Tect0nic.com" target="_blank" rel="noopener">Tectonic</a>
+</div>
+
+<script>
+const saved=localStorage.getItem('theme')||'dark';
+document.documentElement.setAttribute('data-theme',saved);
+document.getElementById('themeBtn').textContent=saved==='dark'?'\u263C':'\u263E';
+function toggleTheme(){const h=document.documentElement,c=h.getAttribute('data-theme'),n=c==='dark'?'light':'dark';h.setAttribute('data-theme',n);localStorage.setItem('theme',n);document.getElementById('themeBtn').textContent=n==='dark'?'\u263C':'\u263E'}
+function copyCmd(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.innerHTML = '&#10003; Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.innerHTML = '&#128203; Copy'; btn.classList.remove('copied'); }, 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    btn.innerHTML = '&#10003; Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.innerHTML = '&#128203; Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f6821f">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<title>Dashboard - Tunnel Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,sans-serif;--radius:16px;--radius-sm:10px;--accent:#f6821f;--accent2:#e65c00;--green:#22c55e;--red:#ef4444;--transition:all .25s ease;--safe-b:env(safe-area-inset-bottom,0px)}
+  [data-theme="dark"]{--bg:#06060e;--surface:rgba(14,14,24,.65);--surface2:rgba(255,255,255,.03);--border:rgba(255,255,255,.05);--border-focus:rgba(246,130,31,.4);--text:#e8e8ec;--text2:#888;--text3:#555;--orb1:#f6821f;--orb2:#6366f1;--card-shadow:0 8px 40px rgba(0,0,0,.2)}
+  [data-theme="light"]{--bg:#f4f4f7;--surface:rgba(255,255,255,.85);--surface2:rgba(0,0,0,.02);--border:rgba(0,0,0,.06);--border-focus:rgba(246,130,31,.5);--text:#1a1a2e;--text2:#666;--text3:#999;--orb1:#f6821f;--orb2:#6366f1;--card-shadow:0 4px 24px rgba(0,0,0,.06)}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
+
+  .bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .bg-orb{position:absolute;border-radius:50%;filter:blur(120px);opacity:.06}
+  .bg-orb-1{width:600px;height:600px;background:var(--orb1);top:-200px;left:-100px;animation:orbFloat 30s ease-in-out infinite}
+  .bg-orb-2{width:500px;height:500px;background:var(--orb2);bottom:-200px;right:-100px;animation:orbFloat 25s ease-in-out infinite reverse}
+  @keyframes orbFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,-30px)}}
+
+  .topbar{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--border);padding:0 16px;height:56px;display:flex;align-items:center;justify-content:space-between;transition:var(--transition)}
+  @media(min-width:640px){.topbar{padding:0 24px}}
+  .top-left{display:flex;align-items:center;gap:10px}
+  .top-logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:15px;color:#000;font-weight:800;box-shadow:0 2px 12px rgba(246,130,31,.25)}
+  .top-title{font-size:14px;font-weight:700;letter-spacing:-.3px}
+  .top-right{display:flex;align-items:center;gap:8px}
+  @media(min-width:640px){.top-right{gap:16px}}
+  .conn{display:none;align-items:center;gap:6px;font-size:11px;padding:5px 10px;border-radius:20px;font-weight:600;letter-spacing:.2px}
+  @media(min-width:640px){.conn{display:flex}}
+  .conn.on{background:rgba(34,197,94,.08);color:var(--green);border:1px solid rgba(34,197,94,.12)}
+  .conn.off{background:rgba(239,68,68,.08);color:var(--red);border:1px solid rgba(239,68,68,.12)}
+  .conn-dot{width:6px;height:6px;border-radius:50%}
+  .conn.on .conn-dot{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .conn.off .conn-dot{background:var(--red)}
+  .health-badge{display:none;align-items:center;gap:5px;font-size:10px;padding:4px 8px;border-radius:12px;font-weight:600;letter-spacing:.2px;border:1px solid var(--border);background:var(--surface2);color:var(--text3)}
+  @media(min-width:640px){.health-badge{display:flex}}
+  .health-badge.ok{border-color:rgba(34,197,94,.15);color:var(--green)}
+  .health-badge.warn{border-color:rgba(251,191,36,.15);color:#fbbf24}
+  .health-badge.err{border-color:rgba(239,68,68,.15);color:var(--red)}
+  .protocol-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(99,102,241,.1);color:#818cf8;letter-spacing:.3px;text-transform:uppercase}
+  .top-link{color:var(--text3);text-decoration:none;font-size:12px;font-weight:500;transition:color .2s;padding:8px 4px}
+  @media(min-width:640px){.top-link{padding:0}}
+  .top-links{display:none;align-items:center;gap:12px}
+  @media(min-width:640px){.top-links{display:flex}}
+
+  .menu-wrap{position:relative}
+  .menu-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:var(--transition);flex-shrink:0;letter-spacing:1px}
+  .menu-btn:active{transform:scale(.95)}
+  @media(min-width:640px){.menu-btn{display:none}}
+  .menu-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:140px;box-shadow:0 12px 40px rgba(0,0,0,.25);opacity:0;visibility:hidden;transform:translateY(-6px);transition:all .2s ease;z-index:200}
+  .menu-dropdown.open{opacity:1;visibility:visible;transform:translateY(0)}
+  .menu-dropdown a{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;transition:var(--transition)}
+  .menu-dropdown a:hover{background:var(--surface2);color:var(--text)}
+  .menu-dropdown a.danger{color:var(--red)}
+
+  .theme-toggle{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:var(--transition);flex-shrink:0}
+  .theme-toggle:active{transform:scale(.95)}
+
+  .main{position:relative;z-index:1;max-width:680px;margin:0 auto;padding:16px 16px calc(80px + var(--safe-b))}
+  @media(min-width:640px){.main{padding:28px 20px 80px}}
+
+  .domain-bar{display:flex;align-items:center;gap:8px;margin-bottom:24px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:4px 0}
+  .domain-bar::-webkit-scrollbar{display:none}
+  .domain-pill{flex-shrink:0;padding:9px 18px;border-radius:24px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--transition);border:1px solid var(--border);background:var(--surface2);color:var(--text3);letter-spacing:.15px}
+  .domain-pill:hover{border-color:rgba(255,255,255,.1);color:var(--text2);background:rgba(255,255,255,.04)}
+  [data-theme="light"] .domain-pill:hover{border-color:rgba(0,0,0,.1);background:rgba(0,0,0,.03)}
+  .domain-pill.active{background:rgba(246,130,31,.08);border-color:rgba(246,130,31,.2);color:var(--accent);box-shadow:0 0 20px rgba(246,130,31,.06)}
+
+  .card{background:var(--surface);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:12px;box-shadow:var(--card-shadow);transition:var(--transition)}
+  @media(min-width:640px){.card{padding:28px;margin-bottom:16px}}
+  .card-title{font-size:15px;font-weight:700;margin-bottom:20px;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
+  .card-title .icon{font-size:14px;opacity:.4}
+
+  .form-row{display:flex;gap:12px;align-items:flex-end}
+  .form-row .field{flex:1}
+  .form-row .field-sm{flex:0 0 130px}
+  @media(max-width:540px){.form-row{flex-direction:column;gap:12px}.form-row .field-sm{flex:1}.form-row .btn{width:100%}}
+
+  .field label{display:block;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+  .field input,.field select{width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;font-weight:500;outline:none;transition:var(--transition);font-family:var(--font);-webkit-appearance:none}
+  @media(min-width:640px){.field input,.field select{font-size:13px}}
+  .field input::placeholder{color:var(--text3)}
+  .field input:focus,.field select:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(246,130,31,.06)}
+  .field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23999'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer}
+  .field select option{background:var(--bg);color:var(--text)}
+
+  .subdomain-input{display:flex;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--border);transition:var(--transition)}
+  .subdomain-input:focus-within{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(246,130,31,.06)}
+  .subdomain-input input{flex:1;padding:12px 14px;background:transparent;border:none;color:var(--text);font-size:15px;font-weight:500;outline:none;min-width:0;font-family:var(--font)}
+  @media(min-width:640px){.subdomain-input input{font-size:13px}}
+  .subdomain-input input::placeholder{color:var(--text3)}
+  .subdomain-input .suffix{padding:12px 14px;background:var(--surface2);color:var(--text3);font-size:12px;font-weight:500;border-left:1px solid var(--border);white-space:nowrap;letter-spacing:.1px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  @media(max-width:400px){.subdomain-input .suffix{font-size:10px;padding:12px 8px}}
+
+  .btn{padding:12px 20px;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;transition:var(--transition);font-family:var(--font);letter-spacing:.1px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+  @media(min-width:640px){.btn{padding:12px 24px;font-size:13px}}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;box-shadow:0 2px 12px rgba(246,130,31,.2)}
+  .btn-primary:hover{box-shadow:0 4px 24px rgba(246,130,31,.35);transform:translateY(-1px)}
+  .btn-primary:active{transform:translateY(0)}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text3);font-weight:600}
+  .btn-ghost:hover{border-color:color-mix(in srgb,var(--text3) 40%,transparent);color:var(--text2);background:var(--surface2)}
+  .btn-red{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.12);color:#fca5a5;font-weight:600}
+  [data-theme="light"] .btn-red{color:#dc2626}
+  .btn-red:hover{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.2)}
+  .btn-sm{padding:7px 14px;font-size:11px;border-radius:8px}
+
+  .tunnel-list{display:flex;flex-direction:column;gap:8px}
+  .tunnel-empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:13px;line-height:1.6}
+  .tunnel-empty .empty-icon{font-size:32px;margin-bottom:12px;opacity:.3}
+  .tunnel-item{display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);transition:var(--transition);position:relative;overflow:hidden}
+  @media(min-width:640px){.tunnel-item{padding:16px 18px;gap:14px}}
+  .tunnel-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--green);border-radius:0 2px 2px 0;opacity:0;transition:opacity .2s}
+  .tunnel-item:hover{border-color:color-mix(in srgb,var(--text3) 20%,transparent);background:color-mix(in srgb,var(--text) 3%,var(--surface2))}
+  .tunnel-item:hover::before{opacity:1}
+  .tunnel-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .tunnel-dot.on{background:var(--green);box-shadow:0 0 8px rgba(34,197,94,.4)}
+  .tunnel-dot.off{background:var(--red)}
+  .tunnel-info{flex:1;min-width:0}
+  .tunnel-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:8px;letter-spacing:-.2px}
+  .tunnel-domain-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;background:rgba(246,130,31,.08);color:var(--accent);letter-spacing:.2px}
+  .tunnel-url{font-size:12px;color:var(--accent);cursor:pointer;word-break:break-all;transition:color .2s;font-weight:500}
+  .tunnel-url:hover{color:#fb923c;text-decoration:underline}
+  .tunnel-meta{font-size:11px;color:var(--text3);margin-top:4px;display:flex;align-items:center;gap:6px}
+  .tunnel-meta .sep{opacity:.3}
+  .tunnel-actions{display:flex;gap:6px;flex-shrink:0}
+  @media(max-width:540px){.tunnel-item{flex-direction:column;align-items:flex-start;gap:10px}.tunnel-actions{width:100%;justify-content:flex-end}.tunnel-actions .btn{flex:1}}
+
+  .toast{position:fixed;bottom:calc(16px + var(--safe-b));left:50%;transform:translateX(-50%) translateY(20px);background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:12px;padding:12px 18px;font-size:13px;font-weight:500;z-index:100;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.ok{border-color:rgba(34,197,94,.2);color:var(--green)}
+  .toast.err{border-color:rgba(239,68,68,.2);color:var(--red)}
+
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.15);border-top-color:#000;border-radius:50%;animation:spin .6s linear infinite}
+  [data-theme="dark"] .spinner{border-color:rgba(255,255,255,.15);border-top-color:var(--accent)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .overlay{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  .overlay.show{display:flex}
+  .progress{background:var(--surface);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border:1px solid var(--border);border-radius:20px;padding:36px;width:420px;max-width:100%;box-shadow:0 32px 80px rgba(0,0,0,.3)}
+  .progress h3{text-align:center;font-size:16px;font-weight:700;margin-bottom:28px;letter-spacing:-.3px}
+
+  .steps{list-style:none}
+  .steps li{display:flex;align-items:flex-start;gap:14px;padding:8px 0;position:relative}
+  .steps li:not(:last-child)::after{content:'';position:absolute;left:13px;top:34px;bottom:-4px;width:1px;background:var(--border)}
+  .steps li.done:not(:last-child)::after{background:rgba(34,197,94,.15)}
+  .steps li.err:not(:last-child)::after{background:rgba(239,68,68,.15)}
+  .steps .ico{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;border:2px solid var(--border);color:var(--text3);background:var(--surface2);transition:var(--transition)}
+  .steps li.run .ico{border-color:var(--accent);color:var(--accent);animation:pulse 1.5s ease-in-out infinite}
+  .steps li.done .ico{border-color:var(--green);background:var(--green);color:#000}
+  .steps li.err .ico{border-color:var(--red);background:var(--red);color:#fff}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(246,130,31,.25)}50%{box-shadow:0 0 0 8px rgba(246,130,31,0)}}
+  .steps .txt{flex:1;padding-top:4px}
+  .steps .lbl{font-size:13px;font-weight:500;color:var(--text2);transition:color .3s}
+  .steps li.done .lbl{color:var(--green)}
+  .steps li.err .lbl{color:var(--red)}
+  .steps .det{font-size:11px;color:var(--text3);margin-top:3px}
+
+  .result{text-align:center;margin-top:24px;display:none}
+  .result.show{display:block}
+  .result-ok{color:var(--green);font-size:13px;font-weight:600;margin-bottom:12px}
+  .result-err{color:var(--red);font-size:13px;margin-bottom:12px}
+  .result-url{font-size:13px;color:var(--accent);cursor:pointer;padding:12px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);display:inline-block;word-break:break-all;transition:var(--transition);font-weight:500}
+  .result-url:hover{border-color:rgba(246,130,31,.3);text-decoration:underline}
+  .result-close{margin-top:14px;text-align:center}
+
+  .alert{padding:14px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+  .alert-warn{background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.1);color:#fbbf24}
+  [data-theme="light"] .alert-warn{background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.15);color:#b45309}
+
+  /* Corner branding */
+  .corner-brand{position:fixed;bottom:calc(12px + var(--safe-b));right:12px;z-index:40;background:var(--surface);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:10px;color:var(--text3);display:flex;align-items:center;gap:5px;box-shadow:0 4px 16px rgba(0,0,0,.15);transition:var(--transition);cursor:default}
+  @media(min-width:640px){.corner-brand{bottom:16px;right:16px;padding:8px 14px;font-size:11px;border-radius:12px}}
+  .corner-brand a{color:var(--accent);text-decoration:none;font-weight:600;transition:color .2s}
+  .corner-brand a:hover{color:#fb923c}
+  .corner-brand .dot{width:3px;height:3px;border-radius:50%;background:var(--text3);opacity:.4}
+  .corner-brand .tip{position:absolute;bottom:calc(100% + 8px);right:0;background:var(--surface);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:10px;color:var(--text2);white-space:nowrap;opacity:0;visibility:hidden;transform:translateY(4px);transition:all .2s;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+  .corner-brand:hover .tip{opacity:1;visibility:visible;transform:translateY(0)}
+
+
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .card{animation:fadeUp .5s ease-out both}
+  .card:nth-child(2){animation-delay:.08s}
+</style>
+</head>
+<body>
+<div class="bg">
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+</div>
+
+<div class="topbar">
+  <div class="top-left">
+    <div class="top-logo">&#9729;</div>
+    <span class="top-title">Tunnel Portal</span>
+  </div>
+  <div class="top-right">
+    <span class="conn {{ 'on' if is_connected else 'off' }}">
+      <span class="conn-dot"></span>
+      {{ 'Connected' if is_connected else 'Not Connected' }}
+    </span>
+    <span class="health-badge {{ 'ok' if tunnel_health.running else 'err' }}" id="healthBadge" title="cloudflared status">
+      <span class="conn-dot" style="width:5px;height:5px;border-radius:50%;background:{{ 'var(--green)' if tunnel_health.running else 'var(--red)' }};{{ 'box-shadow:0 0 4px var(--green)' if tunnel_health.running else '' }}"></span>
+      <span id="healthText">{{ 'Healthy' if tunnel_health.running else 'Down' }}</span>
+      <span class="protocol-badge" id="protocolBadge">{{ protocol }}</span>
+    </span>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="themeBtn">&#9790;</button>
+    <div class="top-links">
+      <a href="/docs" class="top-link">Docs</a>
+      <a href="/setup" class="top-link">Settings</a>
+      <a href="/logout" class="top-link">Logout</a>
+    </div>
+    <div class="menu-wrap">
+      <button class="menu-btn" onclick="toggleMenu()" id="menuBtn">&#8942;</button>
+      <div class="menu-dropdown" id="menuDrop">
+        <a href="/docs">Docs</a>
+        <a href="/setup">Settings</a>
+        <a href="/logout">Logout</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  {% if domains|length > 1 %}
+  <div class="domain-bar">
+    {% for d in domains %}
+    <div class="domain-pill {{ 'active' if d == active_domain }}" onclick="switchDomain('{{ d }}')">{{ d }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if not is_connected %}
+  <div class="alert alert-warn">
+    <span>Cloudflare not connected.</span>
+    <a href="/setup" style="color:inherit;font-weight:700;text-decoration:none">Connect now</a>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-title"><span class="icon">+</span> Create Tunnel</div>
+    <div class="form-row">
+      <div class="field" style="flex:1">
+        <label>Subdomain</label>
+        <div class="subdomain-input">
+          <input type="text" id="subdomain" placeholder="myapp" autocomplete="off" autocapitalize="off" spellcheck="false">
+          <span class="suffix">.{{ active_domain }}</span>
+        </div>
+      </div>
+      <div class="field field-sm">
+        <label>Port</label>
+        <select id="port"><option value="" disabled selected>Loading...</option></select>
+      </div>
+      <button class="btn btn-primary" id="launchBtn" onclick="launch()">Launch</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">&#9729;</span> Active Tunnels
+      <button class="btn btn-ghost btn-sm" onclick="restartCloudflared()" id="restartBtn" style="margin-left:auto;font-size:10px;padding:5px 10px">Restart</button>
+    </div>
+    <div id="tunnelList" class="tunnel-list">
+      {% if tunnels %}
+      {% for key, t in tunnels.items() %}
+      <div class="tunnel-item">
+        <div class="tunnel-dot on"></div>
+        <div class="tunnel-info">
+          <div class="tunnel-name">
+            {{ t.subdomain if t.subdomain else key }}
+            {% if t.domain %}<span class="tunnel-domain-badge">{{ t.domain }}</span>{% endif %}
+          </div>
+          <div class="tunnel-url" onclick="copyURL('{{ t.url }}')" title="Click to copy">{{ t.url }}</div>
+          <div class="tunnel-meta">
+            <span>Port {{ t.port }}</span>
+            <span class="sep">&middot;</span>
+            <span>{{ t.started_at }}</span>
+          </div>
+        </div>
+        <div class="tunnel-actions">
+          <button class="btn btn-ghost btn-sm" onclick="copyURL('{{ t.url }}')">Copy</button>
+          <button class="btn btn-red btn-sm" onclick="stopTunnel('{{ key }}')">Stop</button>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="tunnel-empty">
+        <div class="empty-icon">&#9729;</div>
+        No active tunnels yet.<br>Create one above to get started.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Corner branding -->
+<div class="corner-brand">
+  <span class="tip">Built by Tect0nic</span>
+  Built by <span class="dot"></span> <a href="https://Tect0nic.com" target="_blank" rel="noopener">Tect0nic</a>
+</div>
+
+<!-- Progress overlay -->
+<div class="overlay" id="overlay">
+  <div class="progress">
+    <h3 id="pTitle">Creating Tunnel...</h3>
+    <ol class="steps">
+      <li id="s-dns_cleanup"><div class="ico">1</div><div class="txt"><div class="lbl">Checking DNS</div><div class="det" id="d-dns_cleanup"></div></div></li>
+      <li id="s-tunnel"><div class="ico">2</div><div class="txt"><div class="lbl">Setting up tunnel</div><div class="det" id="d-tunnel"></div></div></li>
+      <li id="s-hostname"><div class="ico">3</div><div class="txt"><div class="lbl">Configuring hostname</div><div class="det" id="d-hostname"></div></div></li>
+      <li id="s-dns_create"><div class="ico">4</div><div class="txt"><div class="lbl">Creating DNS record</div><div class="det" id="d-dns_create"></div></div></li>
+      <li id="s-start"><div class="ico">5</div><div class="txt"><div class="lbl">Starting cloudflared</div><div class="det" id="d-start"></div></div></li>
+    </ol>
+    <div class="result" id="pResult"></div>
+    <div class="result-close" id="pClose" style="display:none">
+      <button class="btn btn-ghost btn-sm" onclick="closeOverlay()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ACTIVE_DOMAIN = '{{ active_domain }}';
+const savedTheme = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', savedTheme);
+document.getElementById('themeBtn').textContent = savedTheme === 'dark' ? '\u263C' : '\u263E';
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const cur = html.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  document.getElementById('themeBtn').textContent = next === 'dark' ? '\u263C' : '\u263E';
+}
+
+function toggleMenu() {
+  const drop = document.getElementById('menuDrop');
+  drop.classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  const wrap = document.querySelector('.menu-wrap');
+  if (wrap && !wrap.contains(e.target)) document.getElementById('menuDrop').classList.remove('open');
+});
+
+document.addEventListener('DOMContentLoaded', async function() {
+  try {
+    const res = await fetch('/api/ports/scan');
+    const data = await res.json();
+    const sel = document.getElementById('port');
+    sel.innerHTML = '';
+    if (data.open_ports && data.open_ports.length > 0) {
+      data.open_ports.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o); });
+    } else {
+      const o = document.createElement('option'); o.value = ''; o.disabled = true; o.textContent = 'No ports found'; sel.appendChild(o);
+    }
+  } catch(e) {
+    document.getElementById('port').innerHTML = '<option value="" disabled>Scan failed</option>';
+  }
+});
+
+function toast(msg, type) { const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast show ' + type; setTimeout(() => t.className = 'toast', 3000); }
+function copyURL(url) { navigator.clipboard.writeText(url).then(() => toast('Copied!', 'ok')); }
+function switchDomain(d) { fetch('/api/domains/active', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({domain: d}) }).then(() => location.reload()); }
+
+function resetSteps() {
+  ['dns_cleanup','tunnel','hostname','dns_create','start'].forEach(s => { document.getElementById('s-' + s).className = ''; document.getElementById('d-' + s).textContent = ''; });
+  document.getElementById('pResult').className = 'result'; document.getElementById('pResult').innerHTML = ''; document.getElementById('pClose').style.display = 'none'; document.getElementById('pTitle').textContent = 'Creating Tunnel...';
+}
+
+function setStep(step, status, msg) {
+  const li = document.getElementById('s-' + step); if (!li) return;
+  li.className = status === 'ok' ? 'done' : status === 'error' ? 'err' : 'run';
+  if (msg) document.getElementById('d-' + step).textContent = msg;
+  const nums = {dns_cleanup:'1',tunnel:'2',hostname:'3',dns_create:'4',start:'5'};
+  li.querySelector('.ico').textContent = status === 'ok' ? '\u2713' : status === 'error' ? '\u2717' : (nums[step] || '');
+}
+
+function showResult(html) { const el = document.getElementById('pResult'); el.innerHTML = html; el.className = 'result show'; document.getElementById('pClose').style.display = 'block'; }
+function closeOverlay() { document.getElementById('overlay').classList.remove('show'); }
+
+async function launch() {
+  const sub = document.getElementById('subdomain').value.trim();
+  const port = document.getElementById('port').value;
+  const btn = document.getElementById('launchBtn');
+  if (!sub) { toast('Enter a subdomain', 'err'); return; }
+  if (!port) { toast('Select a port', 'err'); return; }
+  btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true; resetSteps(); document.getElementById('overlay').classList.add('show');
+  try {
+    const res = await fetch('/api/tunnel/create/stream', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({subdomain: sub, port: parseInt(port), domain: ACTIVE_DOMAIN}) });
+    if (res.status === 401) { const err = await res.json(); document.getElementById('pTitle').textContent = 'Authentication Required'; showResult('<div class="result-err">' + (err.error || 'Not connected') + '</div>'); btn.innerHTML = 'Launch'; btn.disabled = false; return; }
+    if (!res.ok) { const err = await res.json(); document.getElementById('pTitle').textContent = 'Error'; showResult('<div class="result-err">' + (err.error || 'Failed') + '</div>'); btn.innerHTML = 'Launch'; btn.disabled = false; return; }
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+    while (true) {
+      const {done, value} = await reader.read(); if (done) break; buf += dec.decode(value, {stream: true}); const lines = buf.split('\n'); buf = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt.step === 'done') { document.getElementById('pTitle').textContent = 'Tunnel Live!'; setStep('start', 'ok', 'cloudflared running'); const url = evt.detail ? evt.detail.url : ''; showResult('<div class="result-ok">Service is live</div><div class="result-url" onclick="copyURL(\'' + url + '\')">' + url + '</div><div style="margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="copyURL(\'' + url + '\')">Copy URL</button></div>'); btn.innerHTML = 'Launch'; btn.disabled = false; setTimeout(() => location.reload(), 4000); }
+          else if (evt.step === 'error') { document.getElementById('pTitle').textContent = 'Something went wrong'; showResult('<div class="result-err">' + evt.message + '</div>'); btn.innerHTML = 'Launch'; btn.disabled = false; }
+          else { setStep(evt.step, evt.status === 'ok' ? 'ok' : evt.status === 'error' ? 'error' : 'running', evt.message); }
+        } catch(e) {}
+      }
+    }
+  } catch(e) { document.getElementById('pTitle').textContent = 'Connection Error'; showResult('<div class="result-err">Lost connection to server.</div>'); btn.innerHTML = 'Launch'; btn.disabled = false; }
+}
+
+async function stopTunnel(key) {
+  if (!confirm('Stop this tunnel?')) return;
+  try { const res = await fetch('/api/tunnel/stop/' + encodeURIComponent(key), {method: 'POST'}); const data = await res.json(); if (data.success) { toast('Tunnel stopped', 'ok'); setTimeout(() => location.reload(), 800); } else { toast(data.error || 'Failed', 'err'); } } catch(e) { toast('Connection error', 'err'); }
+}
+
+async function restartCloudflared() {
+  const btn = document.getElementById('restartBtn');
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/tunnel/restart', {method: 'POST'});
+    const data = await res.json();
+    if (data.success) {
+      toast('cloudflared restarted (' + (data.protocol || '') + ')', 'ok');
+      updateHealthBadge(true);
+    } else {
+      toast(data.error || 'Restart failed', 'err');
+      updateHealthBadge(false);
+    }
+  } catch(e) { toast('Connection error', 'err'); }
+  btn.innerHTML = 'Restart';
+  btn.disabled = false;
+}
+
+function updateHealthBadge(healthy) {
+  const badge = document.getElementById('healthBadge');
+  const text = document.getElementById('healthText');
+  if (badge) {
+    badge.className = 'health-badge ' + (healthy ? 'ok' : 'err');
+    text.textContent = healthy ? 'Healthy' : 'Down';
+  }
+}
+
+// Poll health every 15 seconds
+async function pollHealth() {
+  try {
+    const res = await fetch('/api/tunnel/health');
+    const data = await res.json();
+    updateHealthBadge(data.cloudflared && data.cloudflared.running);
+    const proto = document.getElementById('protocolBadge');
+    if (proto && data.protocol) proto.textContent = data.protocol;
+  } catch(e) {}
+}
+setInterval(pollHealth, 15000);
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

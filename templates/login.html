@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f6821f">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<title>Login - Tunnel Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,sans-serif;--accent:#f6821f;--accent2:#e65c00;--transition:all .25s ease;--safe-b:env(safe-area-inset-bottom,0px)}
+  [data-theme="dark"]{--bg:#06060e;--surface:rgba(14,14,24,.65);--surface2:rgba(255,255,255,.03);--border:rgba(255,255,255,.05);--text:#e8e8ec;--text2:#888;--text3:#555}
+  [data-theme="light"]{--bg:#f8f8fb;--surface:rgba(255,255,255,.9);--surface2:rgba(0,0,0,.02);--border:rgba(0,0,0,.06);--text:#1a1a2e;--text2:#555;--text3:#999}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;display:flex;transition:background .3s,color .3s}
+
+  .bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .bg-orb{position:absolute;border-radius:50%;filter:blur(140px);opacity:.05}
+  .bg-orb-1{width:700px;height:700px;background:var(--accent);top:-250px;left:-200px;animation:orbFloat 35s ease-in-out infinite}
+  .bg-orb-2{width:500px;height:500px;background:#6366f1;bottom:-250px;right:-200px;animation:orbFloat 30s ease-in-out infinite reverse}
+  @keyframes orbFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,-30px)}}
+  .grid-overlay{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:60px 60px;opacity:.2}
+
+  .left{flex:1;display:none;flex-direction:column;justify-content:center;align-items:center;padding:60px 40px;position:relative;z-index:1}
+  .left-content{text-align:center;max-width:380px}
+  .left-icon{width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:inline-flex;align-items:center;justify-content:center;font-size:36px;color:#000;font-weight:900;box-shadow:0 8px 40px rgba(246,130,31,.3);margin-bottom:28px}
+  .left h1{font-size:28px;font-weight:900;letter-spacing:-.5px;margin-bottom:10px}
+  .left p{font-size:15px;color:var(--text2);line-height:1.6;margin-bottom:36px}
+  .left-features{display:flex;flex-direction:column;gap:14px;text-align:left}
+  .left-feature{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text2)}
+  .left-feature-icon{width:36px;height:36px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+  @media(min-width:900px){.left{display:flex}}
+
+  .right{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 20px;padding-bottom:calc(24px + var(--safe-b));position:relative;z-index:1}
+  .login-box{width:100%;max-width:380px}
+  .login-header{text-align:center;margin-bottom:36px}
+  .login-logo{width:52px;height:52px;border-radius:15px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:inline-flex;align-items:center;justify-content:center;font-size:26px;color:#000;font-weight:900;box-shadow:0 4px 24px rgba(246,130,31,.25);margin-bottom:20px}
+  .login-header h2{font-size:24px;font-weight:800;letter-spacing:-.4px;margin-bottom:6px}
+  .login-header p{font-size:13px;color:var(--text3)}
+
+  .alert{padding:12px 16px;border-radius:12px;font-size:13px;font-weight:500;margin-bottom:16px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.12);color:#fca5a5}
+  [data-theme="light"] .alert{color:#dc2626}
+
+  .form-group{margin-bottom:20px}
+  .form-group label{display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;letter-spacing:.2px}
+  .form-input{width:100%;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:16px;font-weight:500;outline:none;transition:var(--transition);font-family:var(--font);-webkit-appearance:none}
+  .form-input::placeholder{color:var(--text3)}
+  .form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(246,130,31,.08)}
+
+  .login-btn{width:100%;padding:15px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;transition:var(--transition);font-family:var(--font);background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;box-shadow:0 4px 20px rgba(246,130,31,.3);min-height:52px}
+  .login-btn:active{transform:scale(.98)}
+
+  .login-footer{text-align:center;margin-top:28px}
+  .login-footer p{font-size:12px;color:var(--text3)}
+
+  .theme-toggle{position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:var(--transition);z-index:10}
+  .theme-toggle:active{transform:scale(.95)}
+
+  .back-link{position:absolute;top:16px;left:16px;color:var(--text3);text-decoration:none;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;transition:color .2s;z-index:10;padding:8px}
+  .back-link:active{opacity:.7}
+
+  .corner-brand{position:fixed;bottom:calc(12px + var(--safe-b));right:12px;z-index:40;background:var(--surface);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:10px;color:var(--text3);display:flex;align-items:center;gap:5px;box-shadow:0 4px 16px rgba(0,0,0,.1);transition:var(--transition)}
+  @media(min-width:640px){.corner-brand{bottom:16px;right:16px;padding:8px 14px;font-size:11px;border-radius:12px}}
+  .corner-brand a{color:var(--accent);text-decoration:none;font-weight:600}
+  .corner-brand .dot{width:3px;height:3px;border-radius:50%;background:var(--text3);opacity:.4}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  .login-box{animation:fadeUp .6s ease-out}
+  @media(max-width:400px){
+    .login-header h2{font-size:20px}
+    .form-input{font-size:16px;padding:12px 14px}
+    .login-btn{padding:12px;font-size:14px}
+  }
+</style>
+</head>
+<body>
+<div class="bg">
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+</div>
+<div class="grid-overlay"></div>
+
+<a href="/" class="back-link">&#8592; Home</a>
+<button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">&#9790;</button>
+
+<div class="left">
+  <div class="left-content">
+    <div class="left-icon">&#9729;</div>
+    <h1>Tunnel Portal</h1>
+    <p>Expose local services to the internet through Cloudflare Tunnels.</p>
+    <div class="left-features">
+      <div class="left-feature"><div class="left-feature-icon">&#9889;</div>One-click deployment</div>
+      <div class="left-feature"><div class="left-feature-icon">&#128274;</div>OAuth-powered security</div>
+      <div class="left-feature"><div class="left-feature-icon">&#128640;</div>Real-time progress</div>
+      <div class="left-feature"><div class="left-feature-icon">&#127760;</div>Multi-domain support</div>
+    </div>
+  </div>
+</div>
+
+<div class="right">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-logo">&#9729;</div>
+      <h2>Welcome back</h2>
+      <p>Enter your passcode to continue</p>
+    </div>
+    {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+    <form method="POST">
+      <div class="form-group">
+        <label>Passcode</label>
+        <input type="password" name="passcode" class="form-input" placeholder="Enter passcode" autofocus autocomplete="current-password" inputmode="text">
+      </div>
+      <button type="submit" class="login-btn">Sign In</button>
+    </form>
+    <div class="login-footer"><p>Protected by SHA-256 encryption</p></div>
+  </div>
+</div>
+
+<div class="corner-brand">Built by <span class="dot"></span> <a href="https://Tect0nic.com" target="_blank" rel="noopener">Tect0nic</a></div>
+
+<script>
+const savedTheme=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',savedTheme);document.getElementById('themeBtn').textContent=savedTheme==='dark'?'\u263C':'\u263E';
+function toggleTheme(){const h=document.documentElement,c=h.getAttribute('data-theme'),n=c==='dark'?'light':'dark';h.setAttribute('data-theme',n);localStorage.setItem('theme',n);document.getElementById('themeBtn').textContent=n==='dark'?'\u263C':'\u263E'}
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw.js').catch(() => {}); }
+</script>
+</body>
+</html>
