@@ -196,15 +196,24 @@ start_service() {
 
     # Verify server is up
     local waited=0
-    while [ $waited -lt 10 ]; do
-        if curl -sf "http://localhost:${PORT}/api/status" > /dev/null 2>&1; then
+    while [ $waited -lt 15 ]; do
+        if curl -sf "http://127.0.0.1:${PORT}/" > /dev/null 2>&1 || \
+           curl -sf "http://0.0.0.0:${PORT}/" > /dev/null 2>&1; then
             ok "Server running on port ${PORT}"
             return 0
         fi
         sleep 1
         waited=$((waited + 1))
     done
-    warn "Server started but port not responding yet"
+
+    # One more try — longer wait for slow systems
+    sleep 3
+    if curl -sf "http://127.0.0.1:${PORT}/" > /dev/null 2>&1; then
+        ok "Server running on port ${PORT}"
+        return 0
+    fi
+
+    warn "Server may still be starting..."
     return 0
 }
 

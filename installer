@@ -241,7 +241,16 @@ main() {
         nohup $PYTHON app.py > /dev/null 2>&1 &
     fi
     disown
-    sleep 2
+
+    # Wait for server to be ready
+    local waited=0
+    while [ $waited -lt 15 ]; do
+        sleep 1; waited=$((waited + 1))
+        if curl -sf "http://127.0.0.1:${PORT}/" > /dev/null 2>&1 || \
+           curl -sf "http://0.0.0.0:${PORT}/" > /dev/null 2>&1; then
+            break
+        fi
+    done
     ok "Server running on port ${PORT}"
 
     # Start tunnel
