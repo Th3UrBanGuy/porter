@@ -400,10 +400,6 @@ main() {
             start_tunnel
             print_summary
         fi
-            ok "Server started manually on port ${PORT}"
-            start_tunnel
-            print_summary
-        fi
         return
     fi
 
