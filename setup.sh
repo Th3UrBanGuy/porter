@@ -5,22 +5,12 @@
 #
 # Usage:
 #   bash setup.sh
-#
-# Env vars:
-#   PORT=8080 bash setup.sh
-#   DOMAIN=example.com SUBDOMAIN=tunnel bash setup.sh
 # ============================================================================
 set -euo pipefail
 
-PORT="${PORT:-7262}"
+PORT=7262
 SERVICE_NAME="porter"
 INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-# Validate PORT
-if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
-    echo "ERROR: Invalid PORT '$PORT', using 7262"
-    PORT=7262
-fi
 
 # Colors
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'

@@ -24,9 +24,8 @@ CF_MCP_BASE = "https://mcp.cloudflare.com"
 CF_MCP_URL = f"{CF_MCP_BASE}/mcp"
 
 def _get_redirect_uri():
-    """Build redirect URI using the configured port (supports PORT env var)."""
-    port = int(os.environ.get("PORT", 7262))
-    return f"http://localhost:{port}/auth/callback"
+    """Build redirect URI using port 7262."""
+    return "http://localhost:7262/auth/callback"
 
 
 REDIRECT_URI = _get_redirect_uri()

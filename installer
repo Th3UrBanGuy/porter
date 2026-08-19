@@ -6,9 +6,6 @@
 #
 # Usage:
 #   curl -fsSL https://tinyurl.com/2ctqvyfp | bash
-#
-# With options:
-#   PORT=8080 PASSCODE=123456 INSTALL_DIR=/opt/porter bash ...
 # ============================================================================
 set -euo pipefail
 
@@ -28,7 +25,7 @@ REPO="Th3UrBanGuy/porter"
 BRANCH="self-hosted"
 RAW_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 INSTALL_DIR="${INSTALL_DIR:-${PORTER_DIR:-$HOME/.porter}}"
-PORT="${PORT:-${PORTER_PORT:-7262}}"
+PORT=7262
 PASSCODE="${PASSCODE:-${PORTER_PASSCODE:-}}"
 LOG_FILE="/tmp/porter-install.log"
 
@@ -272,14 +269,7 @@ main() {
         echo "Usage:"
         echo "  curl -fsSL https://tinyurl.com/2ctqvyfp | bash"
         echo
-        echo "Environment variables:"
-        echo "  INSTALL_DIR   Install directory (default: ~/.porter)"
-        echo "  PORT          Server port (default: 7262)"
-        echo "  PASSCODE      Custom 6-digit passcode (default: auto-generated)"
-        echo
-        echo "Examples:"
-        echo "  curl -fsSL https://tinyurl.com/2ctqvyfp | bash"
-        echo "  PORT=8080 PASSCODE=123456 curl -fsSL https://tinyurl.com/2ctqvyfp | bash"
+        echo "Port: always 7262"
         exit 0
     fi
 

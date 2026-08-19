@@ -12,16 +12,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-PORT="${PORT:-7262}"
+PORT=7262
 WORKERS="${WORKERS:-2}"
 PROTOCOL_FLAG=""
 export PORT
-
-# Validate PORT is a number
-if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
-    echo "ERROR: Invalid PORT '$PORT', using 7262"
-    PORT=7262
-fi
 
 # Check if port is already in use and kill stale process
 _port_user=$(lsof -ti:"$PORT" 2>/dev/null || true)

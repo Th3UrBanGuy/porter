@@ -42,17 +42,8 @@ app.secret_key = secrets.token_hex(32)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 def _resolve_port():
-    """Read PORT from env, validate it, return usable int."""
-    raw = os.environ.get("PORT", "7262").strip()
-    if not raw:
-        raw = "7262"
-    try:
-        port = int(raw)
-    except (ValueError, TypeError):
-        port = 7262
-    if not (1 <= port <= 65535):
-        port = 7262
-    return port
+    """Always use 7262."""
+    return 7262
 
 
 def _port_is_available(port):
