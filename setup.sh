@@ -122,7 +122,7 @@ has_systemd() {
 create_service() {
     if ! has_systemd; then
         warn "systemd not available (container / non-systemd init), skipping service"
-        return 1
+        return 0
     fi
 
     info "Creating systemd service..."
