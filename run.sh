@@ -15,6 +15,21 @@ cd "$SCRIPT_DIR"
 PORT="${PORT:-7262}"
 WORKERS="${WORKERS:-2}"
 PROTOCOL_FLAG=""
+export PORT
+
+# Validate PORT is a number
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
+    echo "ERROR: Invalid PORT '$PORT', using 7262"
+    PORT=7262
+fi
+
+# Check if port is already in use and kill stale process
+_port_user=$(lsof -ti:"$PORT" 2>/dev/null || true)
+if [ -n "${_port_user:-}" ]; then
+    echo "  Port $PORT in use (PID $_port_user), stopping..."
+    kill "$_port_user" 2>/dev/null || true
+    sleep 1
+fi
 
 # Parse args
 MODE="prod"
@@ -47,6 +62,20 @@ else
     echo "  Workers: $WORKERS"
     echo "  Protocol: auto (WSL2-aware)"
     echo "=========================================="
+
+    # Pre-flight: verify port is free before gunicorn binds
+    python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+try:
+    s.bind(('0.0.0.0', $PORT))
+    s.close()
+except OSError as e:
+    print(f'FATAL: Port $PORT unavailable: {e}', file=sys.stderr)
+    sys.exit(1)
+" || exit 1
+
     exec gunicorn \
         --bind "0.0.0.0:$PORT" \
         --workers "$WORKERS" \

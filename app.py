@@ -41,18 +41,48 @@ app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
-PORT = 7262
+def _resolve_port():
+    """Read PORT from env, validate it, return usable int."""
+    raw = os.environ.get("PORT", "7262").strip()
+    if not raw:
+        raw = "7262"
+    try:
+        port = int(raw)
+    except (ValueError, TypeError):
+        port = 7262
+    if not (1 <= port <= 65535):
+        port = 7262
+    return port
+
+
+def _port_is_available(port):
+    """Return True if the port is free on 0.0.0.0."""
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(("0.0.0.0", port))
+            return True
+    except OSError:
+        return False
+
+
+PORT = _resolve_port()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = os.path.join(BASE_DIR, "portal.log")
 
-# --- Logging with rotation ---
+# --- Logging with rotation (graceful fallback for read-only filesystems) ---
+_log_handlers = [logging.StreamHandler(sys.stdout)]
+try:
+    _file_handler = RotatingFileHandler(LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3)
+    _log_handlers.append(_file_handler)
+except (OSError, PermissionError):
+    pass  # Read-only filesystem — log to stdout only
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        RotatingFileHandler(LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3),
-        logging.StreamHandler(sys.stdout),
-    ],
+    handlers=_log_handlers,
 )
 log = logging.getLogger("portal")
 
@@ -851,7 +881,26 @@ def api_keys_rotate(key_id):
 
 
 if __name__ == "__main__":
-    log.info("Starting Cloudflare Tunnel Portal on port %s", PORT)
+    # Validate port before doing anything else
+    if not _port_is_available(PORT):
+        log.error("Port %s is already in use. Set PORT env var to a free port.", PORT)
+        sys.exit(1)
+
+    # Graceful shutdown for systemd (SIGTERM)
+    def _shutdown(signum, frame):
+        log.info("Received signal %s, shutting down...", signum)
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
+    log.info("=" * 50)
+    log.info("  Porter - Cloudflare Tunnel Portal")
+    log.info("  Port:     %s", PORT)
+    log.info("  Bind:     0.0.0.0:%s", PORT)
+    log.info("  URL:      http://0.0.0.0:%s", PORT)
+    log.info("  PID:      %s", os.getpid())
+    log.info("=" * 50)
 
     # Initialize TunnelManager (detects existing cloudflared processes)
     manager = get_manager()

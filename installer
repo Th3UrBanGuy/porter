@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Porter — Universal Installer v2
-# Works on: Linux, macOS, Windows (Git Bash/WSL/MSYS2), Termux (Android)
+# Porter — Universal Installer v3
+# Downloads Porter, then delegates to setup.sh (Linux/VPS) or handles
+# Termux/Windows natively.
 #
 # Usage:
 #   curl -fsSL https://tinyurl.com/2ctqvyfp | bash
 #
 # With options:
-#   PORTER_PORT=8080 PORTER_PASSCODE=123456 PORTER_DIR=/opt/porter bash ...
+#   PORT=8080 PASSCODE=123456 INSTALL_DIR=/opt/porter bash ...
 # ============================================================================
 set -euo pipefail
 
@@ -25,12 +26,10 @@ fi
 # ──────────────────────────────────────────────────────────────
 REPO="Th3UrBanGuy/porter"
 BRANCH="self-hosted"
-REPO_URL="https://github.com/${REPO}"
 RAW_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
-INSTALL_DIR="${PORTER_DIR:-$HOME/.porter}"
-PORT="${PORTER_PORT:-7262}"
-PASSCODE="${PORTER_PASSCODE:-}"
-SKIP_START="${PORTER_SKIP_START:-false}"
+INSTALL_DIR="${INSTALL_DIR:-${PORTER_DIR:-$HOME/.porter}}"
+PORT="${PORT:-${PORTER_PORT:-7262}}"
+PASSCODE="${PASSCODE:-${PORTER_PASSCODE:-}}"
 LOG_FILE="/tmp/porter-install.log"
 
 # ──────────────────────────────────────────────────────────────
@@ -48,12 +47,7 @@ err()  { printf "  ${RED}✘${RESET} %s\n" "$1" >&2; }
 warn() { printf "  ${YELLOW}⚠${RESET} %s\n" "$1"; }
 info() { printf "  ${CYAN}→${RESET} %s\n" "$1"; }
 header() { echo; printf "${BOLD}%s${RESET}\n" "$1"; printf '%0.s─' {1..50}; echo; }
-
 die() { err "$1"; exit 1; }
-
-# ──────────────────────────────────────────────────────────────
-#  Logging
-# ──────────────────────────────────────────────────────────────
 log() { echo "[$(date '+%H:%M:%S')] $1" >> "$LOG_FILE" 2>/dev/null || true; }
 
 # ──────────────────────────────────────────────────────────────
@@ -61,10 +55,6 @@ log() { echo "[$(date '+%H:%M:%S')] $1" >> "$LOG_FILE" 2>/dev/null || true; }
 # ──────────────────────────────────────────────────────────────
 IS_TERMUX=false
 IS_WINDOWS_NATIVE=false
-HAS_GIT=false
-PYTHON=""
-PIP=""
-PIP_FLAGS=""
 
 detect_platform() {
     OS="$(uname -s 2>/dev/null || echo Windows)"
@@ -86,186 +76,13 @@ detect_platform() {
     esac
 
     case "$ARCH" in
-        x86_64|amd64) ARCH="amd64" ;;
-        aarch64|arm64|armv8*) ARCH="arm64" ;;
-        armv7*|armv7l|armhf) ARCH="arm" ;;
-        *) ARCH="amd64" ;;
+        x86_64|amd64)   ARCH="amd64" ;;
+        aarch64|arm64)   ARCH="arm64" ;;
+        armv7*|armhf)    ARCH="arm" ;;
+        *)               ARCH="amd64" ;;
     esac
 
     info "Platform: ${PLATFORM}/${ARCH}"
-    log "Platform: ${PLATFORM}/${ARCH} | IS_TERMUX=${IS_TERMUX} | IS_WINDOWS=${IS_WINDOWS_NATIVE}"
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Package managers
-# ──────────────────────────────────────────────────────────────
-pkg_install() {
-    local pkg="$1"
-    log "Installing system package: $pkg"
-    if $IS_TERMUX; then
-        pkg install -y "$pkg" 2>>"$LOG_FILE" || return 1
-    elif [ "$PLATFORM" = "macos" ]; then
-        command -v brew &>/dev/null && brew install "$pkg" 2>>"$LOG_FILE" || return 1
-    elif $IS_WINDOWS_NATIVE; then
-        for mgr in winget choco scoop; do
-            if command -v "$mgr" &>/dev/null; then
-                case "$mgr" in
-                    winget) winget install --id "$pkg" --accept-source-agreements --accept-package-agreements 2>>"$LOG_FILE" && return 0 ;;
-                    choco)  choco install "$pkg" -y 2>>"$LOG_FILE" && return 0 ;;
-                    scoop)  scoop install "$pkg" 2>>"$LOG_FILE" && return 0 ;;
-                esac
-            fi
-        done
-        return 1
-    else
-        for mgr in apt dnf yum pacman; do
-            if command -v "$mgr" &>/dev/null; then
-                case "$mgr" in
-                    apt)    sudo apt install -y "$pkg" 2>>"$LOG_FILE" && return 0 ;;
-                    dnf)    sudo dnf install -y "$pkg" 2>>"$LOG_FILE" && return 0 ;;
-                    yum)    sudo yum install -y "$pkg" 2>>"$LOG_FILE" && return 0 ;;
-                    pacman) sudo pacman -S --noconfirm "$pkg" 2>>"$LOG_FILE" && return 0 ;;
-                esac
-            fi
-        done
-        return 1
-    fi
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Find Python
-# ──────────────────────────────────────────────────────────────
-find_python() {
-    PYTHON=""
-    for cmd in python3 python python3.12 python3.11 python3.10; do
-        if command -v "$cmd" &>/dev/null; then
-            # Verify it's Python 3
-            if "$cmd" -c "import sys; assert sys.version_info >= (3, 8)" 2>/dev/null; then
-                PYTHON="$cmd"
-                break
-            fi
-        fi
-    done
-}
-
-ensure_python() {
-    header "Checking Python"
-
-    find_python
-
-    if [ -n "$PYTHON" ]; then
-        local ver
-        ver=$("$PYTHON" --version 2>&1 | awk '{print $2}')
-        ok "Python ${ver} (${PYTHON})"
-        return
-    fi
-
-    warn "Python 3.8+ not found, installing..."
-    if $IS_TERMUX; then
-        pkg_install python || die "Failed to install Python. Run: pkg install python"
-    elif [ "$PLATFORM" = "macos" ]; then
-        if command -v brew &>/dev/null; then
-            brew install python3 2>>"$LOG_FILE" || die "Failed to install Python via Homebrew"
-        else
-            die "Python not found. Install Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-        fi
-    elif $IS_WINDOWS_NATIVE; then
-        pkg_install Python.Python.3.12 2>>"$LOG_FILE" || die "Python not found. Install from https://python.org or: winget install Python.Python.3.12"
-    else
-        pkg_install python3 || die "Failed to install Python. Run: sudo apt install python3 python3-pip python3-venv"
-    fi
-
-    # Re-check after install
-    find_python
-    [ -n "$PYTHON" ] || die "Python 3 could not be found after installation"
-    ok "Python installed: $("$PYTHON" --version 2>&1)"
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Find pip
-# ──────────────────────────────────────────────────────────────
-find_pip() {
-    PIP=""
-    if "$PYTHON" -m pip --version &>/dev/null 2>&1; then
-        PIP="$PYTHON -m pip"
-    fi
-}
-
-ensure_pip() {
-    header "Checking pip"
-
-    find_pip
-
-    if [ -n "$PIP" ]; then
-        # Verify pip actually works
-        if $PYTHON -m pip --version &>/dev/null 2>&1; then
-            ok "pip available"
-            return
-        fi
-        warn "pip found but not working, reinstalling..."
-    fi
-
-    warn "pip not found or broken, installing..."
-
-    # Method 1: ensurepip
-    info "Trying ensurepip..."
-    "$PYTHON" -m ensurepip --default-pip 2>>"$LOG_FILE" || true
-    "$PYTHON" -m ensurepip 2>>"$LOG_FILE" || true
-
-    # Method 2: get-pip.py
-    info "Trying get-pip.py..."
-    local get_pip=$(mktemp)
-    if download_file "https://bootstrap.pypa.io/get-pip.py" "$get_pip" 2>>"$LOG_FILE"; then
-        "$PYTHON" "$get_pip" --break-system-packages 2>>"$LOG_FILE" || \
-        "$PYTHON" "$get_pip" --user 2>>"$LOG_FILE" || \
-        "$PYTHON" "$get_pip" 2>>"$LOG_FILE" || true
-    fi
-    rm -f "$get_pip"
-
-    # Method 3: reinstall via ensurepip --upgrade
-    "$PYTHON" -m ensurepip --upgrade 2>>"$LOG_FILE" || true
-
-    # Method 4: try apt-get install python3-pip (Debian/Ubuntu)
-    if command -v apt-get &>/dev/null; then
-        info "Trying apt-get install python3-pip..."
-        sudo apt-get install -y python3-pip 2>>"$LOG_FILE" || true
-    fi
-
-    find_pip
-    [ -n "$PIP" ] || die "pip could not be installed. Run: $PYTHON -m ensurepip"
-    ok "pip installed"
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Detect --break-system-packages requirement
-# ──────────────────────────────────────────────────────────────
-detect_pip_flags() {
-    PIP_FLAGS=""
-    # Try dry-run to detect --break-system-packages requirement
-    if $PYTHON -m pip install --dry-run nonexistent-package-porter-test 2>&1 | grep -qi "break-system-packages"; then
-        PIP_FLAGS="--break-system-packages"
-        info "Detected PEP 668: using --break-system-packages"
-    fi
-    # Termux: always use --user
-    if $IS_TERMUX; then
-        PIP_FLAGS="--user"
-    fi
-    # Verify pip actually works
-    if ! $PYTHON -m pip --version &>/dev/null 2>&1; then
-        warn "pip not working, trying to fix..."
-        # Try ensurepip
-        $PYTHON -m ensurepip --default-pip 2>/dev/null || true
-        $PYTHON -m ensurepip 2>/dev/null || true
-        # Try get-pip.py
-        local get_pip=$(mktemp)
-        if download_file "https://bootstrap.pypa.io/get-pip.py" "$get_pip" 2>/dev/null; then
-            $PYTHON "$get_pip" --break-system-packages 2>/dev/null || \
-            $PYTHON "$get_pip" --user 2>/dev/null || \
-            $PYTHON "$get_pip" 2>/dev/null || true
-        fi
-        rm -f "$get_pip"
-        find_pip
-    fi
 }
 
 # ──────────────────────────────────────────────────────────────
@@ -280,10 +97,8 @@ find_downloader() {
         DOWNLOADER="wget"
     else
         warn "Neither curl nor wget found, installing curl..."
-        if $IS_TERMUX; then
-            pkg_install curl || die "curl/wget required. Run: pkg install curl"
-        elif [ "$PLATFORM" != "macos" ]; then
-            pkg_install curl || die "curl/wget required"
+        if command -v apt-get &>/dev/null; then
+            sudo apt-get install -y -qq curl 2>>"$LOG_FILE" || true
         fi
         if command -v curl &>/dev/null; then
             DOWNLOADER="curl"
@@ -299,7 +114,6 @@ find_downloader() {
 download_file() {
     local url="$1" dest="$2"
     mkdir -p "$(dirname "$dest")"
-
     local retry
     for retry in 1 2 3; do
         if [ "$DOWNLOADER" = "curl" ]; then
@@ -345,7 +159,7 @@ download_files() {
     local failed=0
 
     # Core Python files
-    for f in app.py cloudflare_client.py tunnel_manager.py api_keys.py requirements.txt setup.py; do
+    for f in app.py cloudflare_client.py tunnel_manager.py api_keys.py requirements.txt setup.py run.sh setup.sh; do
         download_and_verify "${RAW_URL}/${f}" "${INSTALL_DIR}/${f}" "$f" || ((failed++))
     done
 
@@ -373,472 +187,8 @@ download_files() {
     fi
 
     ok "All files downloaded successfully"
-
-    # Create run.sh
-    if $IS_TERMUX; then
-        # Termux: no gunicorn, use Flask dev server
-        cat > "${INSTALL_DIR}/run.sh" << 'RUNEOF'
-#!/usr/bin/env bash
-set -euo pipefail
-cd "$(dirname "$0")"
-PORT="${PORT:-7262}"
-# Auto-install deps if missing
-if ! python3 -c "import flask, httpx" 2>/dev/null; then
-    pip_flags=""
-    if python3 -m pip install --dry-run nonexistent-package-porter-test 2>&1 | grep -qi "break-system-packages"; then
-        pip_flags="--break-system-packages"
-    fi
-    python3 -m pip install flask httpx --quiet $pip_flags 2>/dev/null || \
-    python3 -m pip install flask httpx --user --quiet 2>/dev/null || true
-fi
-exec python3 app.py
-RUNEOF
-    else
-        cat > "${INSTALL_DIR}/run.sh" << 'RUNEOF'
-#!/usr/bin/env bash
-set -euo pipefail
-cd "$(dirname "$0")"
-PORT="${PORT:-7262}"
-# Auto-install deps if missing
-if ! python3 -c "import flask, httpx" 2>/dev/null; then
-    pip_flags=""
-    if python3 -m pip install --dry-run nonexistent-package-porter-test 2>&1 | grep -qi "break-system-packages"; then
-        pip_flags="--break-system-packages"
-    fi
-    python3 -m pip install -r requirements.txt --quiet $pip_flags 2>/dev/null || \
-    python3 -m pip install -r requirements.txt --user --quiet 2>/dev/null || true
-fi
-if command -v gunicorn &>/dev/null; then
-    exec gunicorn --bind "0.0.0.0:$PORT" --workers 2 --worker-class gevent --timeout 120 --preload app:app
-else
-    exec python3 app.py
-fi
-RUNEOF
-    fi
+    chmod +x "${INSTALL_DIR}/setup.sh" 2>/dev/null || true
     chmod +x "${INSTALL_DIR}/run.sh" 2>/dev/null || true
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Install ALL Python dependencies (MANDATORY)
-# ──────────────────────────────────────────────────────────────
-show_pip_error() {
-    local label="$1"
-    local output="$2"
-    if [ -n "$output" ]; then
-        local last_lines=$(echo "$output" | tail -5)
-        log "$label error: $last_lines"
-        # Show concise error to user
-        local err_msg=$(echo "$output" | grep -i "error\|failed\|exception\|denied\|permission" | tail -1)
-        if [ -n "$err_msg" ]; then
-            warn "  → $err_msg"
-        fi
-    fi
-}
-
-install_deps() {
-    header "Installing Python dependencies"
-
-    if [ -z "$PIP" ]; then
-        die "pip is not available. Cannot install dependencies."
-    fi
-
-    local req="${INSTALL_DIR}/requirements.txt"
-
-    if [ ! -f "$req" ]; then
-        if $IS_TERMUX; then
-            # Termux: gunicorn/gevent need C compilation, make them optional
-            cat > "$req" << 'REQEOF'
-flask>=3.0
-httpx>=0.25
-REQEOF
-        else
-            cat > "$req" << 'REQEOF'
-flask>=3.0
-httpx>=0.25
-gunicorn>=21.0
-gevent>=23.0
-REQEOF
-        fi
-    fi
-
-    # Check if already installed
-    if "$PYTHON" -c "import flask, httpx" 2>/dev/null; then
-        ok "Dependencies already installed"
-        return 0
-    fi
-
-    info "Installing from requirements.txt..."
-    log "Python: $PYTHON"
-    log "Pip: $PIP"
-    log "PIP_FLAGS: $PIP_FLAGS"
-
-    # ── Strategy 1: pip install with all flags ──
-    local strategies=(
-        "$PIP install $PIP_FLAGS -r $req --quiet"
-        "$PIP install -r $req --break-system-packages --quiet"
-        "$PIP install -r $req --user --quiet"
-        "$PIP install -r $req --force-reinstall --quiet"
-        "$PIP install -r $req --break-system-packages --force-reinstall --quiet"
-    )
-
-    for strategy in "${strategies[@]}"; do
-        log "Trying: $strategy"
-        local output
-        output=$(eval "$strategy" 2>&1) || true
-        log "Output: $output"
-        if echo "$output" | grep -qi "success\|installed\|already" || \
-           "$PYTHON" -c "import flask, httpx" 2>/dev/null; then
-            ok "Dependencies installed"
-            return 0
-        fi
-        show_pip_error "$strategy" "$output"
-    done
-
-    # ── Strategy 2: Install packages individually with every flag combo ──
-    warn "Bulk install failed, trying individual packages..."
-    local pkgs=("flask" "httpx")
-    # gunicorn/gevent optional on Termux (need C compilation)
-    if ! $IS_TERMUX; then
-        pkgs+=("gunicorn" "gevent")
-    fi
-    local installed=0
-
-    for pkg in "${pkgs[@]}"; do
-        # Skip if already installed
-        if "$PYTHON" -c "import $pkg" 2>/dev/null; then
-            ok "$pkg already installed"
-            ((installed++))
-            continue
-        fi
-
-        local pkg_installed=false
-        for flags in "$PIP_FLAGS" "--break-system-packages" "--user" ""; do
-            log "Trying: $PIP install $flags $pkg"
-            local output
-            output=$($PIP install $flags "$pkg" --quiet 2>&1) || true
-            log "Output: $output"
-            if "$PYTHON" -c "import $pkg" 2>/dev/null; then
-                ok "Installed $pkg"
-                pkg_installed=true
-                ((installed++))
-                break
-            fi
-            show_pip_error "$pkg" "$output"
-        done
-
-        if [ "$pkg_installed" = false ]; then
-            if $IS_TERMUX && [ "$pkg" = "gunicorn" -o "$pkg" = "gevent" ]; then
-                warn "$pkg not available on Termux (optional, using Flask dev server)"
-            else
-                err "FAILED to install $pkg"
-            fi
-        fi
-    done
-
-    local min_required=2
-    if ! $IS_TERMUX; then
-        min_required=4
-    fi
-
-    if [ "$installed" -ge "$min_required" ]; then
-        ok "Core dependencies installed ($installed packages)"
-        return 0
-    fi
-
-    # ── Strategy 3: Create virtual environment ──
-    warn "Trying virtual environment..."
-    local venv_dir="${INSTALL_DIR}/.venv"
-    if "$PYTHON" -m venv "$venv_dir" 2>>"$LOG_FILE"; then
-        local venv_pip="${venv_dir}/bin/pip"
-        local venv_python="${venv_dir}/bin/python"
-        if [ -f "$venv_pip" ]; then
-            log "Using venv pip: $venv_pip"
-            if "$venv_pip" install -r "$req" --quiet 2>>"$LOG_FILE"; then
-                if "$venv_python" -c "import flask, httpx" 2>/dev/null; then
-                    ok "Dependencies installed (venv)"
-                    # Update PIP and PYTHON to use venv
-                    PIP="$venv_pip"
-                    PYTHON="$venv_python"
-                    return 0
-                fi
-            fi
-        fi
-    fi
-
-    # ── Strategy 4: Install pip from get-pip.py ──
-    warn "Trying to reinstall pip from get-pip.py..."
-    local get_pip=$(mktemp)
-    if download_file "https://bootstrap.pypa.io/get-pip.py" "$get_pip" 2>/dev/null; then
-        if "$PYTHON" "$get_pip" --break-system-packages 2>>"$LOG_FILE" || \
-           "$PYTHON" "$get_pip" --user 2>>"$LOG_FILE" || \
-           "$PYTHON" "$get_pip" 2>>"$LOG_FILE"; then
-            find_pip
-            if [ -n "$PIP" ]; then
-                log "Pip reinstalled, retrying..."
-                if $PIP install -r "$req" --break-system-packages --quiet 2>>"$LOG_FILE" || \
-                   $PIP install -r "$req" --user --quiet 2>>"$LOG_FILE"; then
-                    if "$PYTHON" -c "import flask, httpx" 2>/dev/null; then
-                        ok "Dependencies installed (pip reinstalled)"
-                        return 0
-                    fi
-                fi
-            fi
-        fi
-    fi
-    rm -f "$get_pip"
-
-    # ── Strategy 5: Try every Python version available ──
-    warn "Trying other Python versions..."
-    for py_cmd in python3.12 python3.11 python3.10 python3.9 python3 python; do
-        if command -v "$py_cmd" &>/dev/null; then
-            local py_ver=$("$py_cmd" --version 2>&1 | grep -oP '\d+\.\d+' | head -1)
-            if [ -n "$py_ver" ]; then
-                log "Trying $py_cmd ($py_ver)"
-                "$py_cmd" -m pip install flask httpx --break-system-packages --quiet 2>>"$LOG_FILE" && \
-                if ! $IS_TERMUX; then
-                    "$py_cmd" -m pip install gunicorn gevent --break-system-packages --quiet 2>>"$LOG_FILE" || true
-                fi && \
-                if "$py_cmd" -c "import flask, httpx" 2>/dev/null; then
-                    ok "Dependencies installed ($py_cmd)"
-                    PYTHON="$py_cmd"
-                    PIP="$py_cmd -m pip"
-                    return 0
-                fi
-            fi
-        fi
-    done
-
-    # ── All strategies failed ──
-    echo
-    err "All installation strategies failed."
-    echo
-    info "Debug info (check $LOG_FILE for details):"
-    info "  Python: $($PYTHON --version 2>&1)"
-    info "  Pip: $($PYTHON -m pip --version 2>&1)"
-    info "  Platform: $PLATFORM/$ARCH"
-    echo
-    # Show last 20 lines of log
-    if [ -f "$LOG_FILE" ]; then
-        info "Last 20 lines of install log:"
-        tail -20 "$LOG_FILE" | while IFS= read -r line; do
-            echo "    $line"
-        done
-    fi
-    echo
-    info "Try manually:"
-    info "  $PYTHON -m pip install flask httpx gunicorn gevent --break-system-packages"
-    echo
-    die "Cannot install dependencies. Porter requires flask and httpx."
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Verify Python deps are importable
-# ──────────────────────────────────────────────────────────────
-verify_deps() {
-    header "Verifying dependencies"
-
-    local all_ok=true
-    for pkg in flask httpx; do
-        if "$PYTHON" -c "import $pkg" 2>/dev/null; then
-            ok "import $pkg"
-        else
-            warn "import $pkg missing, installing..."
-            # Try to install missing package
-            if $PIP install $PIP_FLAGS "$pkg" --quiet 2>>"$LOG_FILE" || \
-               $PIP install "$pkg" --break-system-packages --quiet 2>>"$LOG_FILE" || \
-               $PIP install "$pkg" --user --quiet 2>>"$LOG_FILE"; then
-                if "$PYTHON" -c "import $pkg" 2>/dev/null; then
-                    ok "import $pkg (installed)"
-                else
-                    err "import $pkg FAILED even after install"
-                    all_ok=false
-                fi
-            else
-                err "import $pkg FAILED and could not install"
-                all_ok=false
-            fi
-        fi
-    done
-
-    # Optional but recommended
-    for pkg in gunicorn gevent; do
-        if "$PYTHON" -c "import $pkg" 2>/dev/null; then
-            ok "import $pkg"
-        else
-            warn "import $pkg missing, installing..."
-            $PIP install $PIP_FLAGS "$pkg" --quiet 2>>"$LOG_FILE" || \
-            $PIP install "$pkg" --break-system-packages --quiet 2>>"$LOG_FILE" || \
-            $PIP install "$pkg" --user --quiet 2>>"$LOG_FILE" || true
-            if "$PYTHON" -c "import $pkg" 2>/dev/null; then
-                ok "import $pkg (installed)"
-            else
-                warn "import $pkg (optional, needed for production mode)"
-            fi
-        fi
-    done
-
-    $all_ok || die "Core dependencies (flask, httpx) are not installed"
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Install cloudflared
-# ──────────────────────────────────────────────────────────────
-install_cloudflared() {
-    header "Installing cloudflared"
-
-    if command -v cloudflared &>/dev/null; then
-        local cf_ver
-        cf_ver=$(cloudflared --version 2>&1 | head -1 || echo "unknown")
-        ok "cloudflared already installed (${cf_ver})"
-        return
-    fi
-
-    local CF_URL CF_DEST
-
-    if $IS_TERMUX; then
-        case "$ARCH" in
-            arm64) CF_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64" ;;
-            arm)   CF_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm" ;;
-            *)     CF_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" ;;
-        esac
-        CF_DEST="$PREFIX/bin/cloudflared"
-        [ -z "${PREFIX:-}" ] && CF_DEST="$HOME/.local/bin/cloudflared"
-        mkdir -p "$(dirname "$CF_DEST")"
-        info "Downloading cloudflared for Termux..."
-        download_file "$CF_URL" "$CF_DEST" || die "Failed to download cloudflared"
-        chmod +x "$CF_DEST"
-
-        # Ensure PATH includes the install dir
-        local bin_dir
-        bin_dir="$(dirname "$CF_DEST")"
-        export PATH="$bin_dir:$PATH"
-        if ! grep -q "$bin_dir" "$HOME/.bashrc" 2>/dev/null; then
-            echo "export PATH=\"$bin_dir:\$PATH\"" >> "$HOME/.bashrc"
-        fi
-        ok "cloudflared installed to ${CF_DEST}"
-
-    elif [ "$PLATFORM" = "macos" ]; then
-        if command -v brew &>/dev/null; then
-            info "Installing via Homebrew..."
-            brew install cloudflared 2>>"$LOG_FILE" || {
-                warn "Homebrew install failed, downloading binary..."
-                _install_cf_binary
-            }
-        else
-            _install_cf_binary
-        fi
-
-    elif $IS_WINDOWS_NATIVE; then
-        CF_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
-        CF_DEST="$HOME/cloudflared.exe"
-        info "Downloading cloudflared for Windows..."
-        download_file "$CF_URL" "$CF_DEST" || die "Failed to download cloudflared"
-        ok "cloudflared installed to ${CF_DEST}"
-        # Add to PATH if needed
-        local home_bin="$HOME"
-        if ! echo "$PATH" | grep -q "$home_bin"; then
-            export PATH="$home_bin:$PATH"
-        fi
-
-    else
-        _install_cf_binary
-    fi
-
-    # Verify installation
-    if command -v cloudflared &>/dev/null; then
-        ok "cloudflared is ready"
-    elif [ -x "$HOME/.local/bin/cloudflared" ]; then
-        export PATH="$HOME/.local/bin:$PATH"
-        ok "cloudflared is ready"
-    else
-        warn "cloudflared installed but may not be in PATH"
-    fi
-}
-
-_install_cf_binary() {
-    local CF_URL CF_DEST
-    case "$ARCH" in
-        arm64) CF_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64" ;;
-        arm)   CF_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm" ;;
-        *)     CF_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" ;;
-    esac
-
-    CF_DEST="$HOME/.local/bin/cloudflared"
-    mkdir -p "$(dirname "$CF_DEST")"
-    info "Downloading cloudflared..."
-    download_file "$CF_URL" "$CF_DEST" || die "Failed to download cloudflared"
-    chmod +x "$CF_DEST"
-    export PATH="$HOME/.local/bin:$PATH"
-
-    # Persist PATH
-    local SHELL_RC="$HOME/.bashrc"
-    [ -n "${ZSH_VERSION:-}" ] && SHELL_RC="$HOME/.zshrc"
-    if ! grep -q '.local/bin' "$SHELL_RC" 2>/dev/null; then
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_RC"
-    fi
-    ok "cloudflared installed"
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Install CLI (porter command)
-# ──────────────────────────────────────────────────────────────
-install_cli() {
-    header "Installing Porter CLI"
-
-    # Try pip install -e first
-    if [ -f "${INSTALL_DIR}/setup.py" ] && [ -n "$PIP" ]; then
-        info "Installing porter command via pip..."
-        if $PIP install -e "${INSTALL_DIR}" --quiet 2>>"$LOG_FILE"; then
-            ok "CLI installed: porter (via pip)"
-            return
-        fi
-        warn "pip install -e failed, creating wrapper..."
-    fi
-
-    # Fallback: create wrapper script
-    _create_porter_wrapper
-}
-
-_create_porter_wrapper() {
-    local BIN_DIR
-    if $IS_TERMUX; then
-        BIN_DIR="${PREFIX:-$HOME/.local/bin}"
-    elif $IS_WINDOWS_NATIVE; then
-        BIN_DIR="${APPDATA:-$HOME}/Python/Scripts"
-        mkdir -p "$BIN_DIR" 2>/dev/null || BIN_DIR="$HOME/.local/bin"
-    else
-        BIN_DIR="$HOME/.local/bin"
-    fi
-
-    mkdir -p "$BIN_DIR"
-
-    if $IS_WINDOWS_NATIVE; then
-        cat > "$BIN_DIR/porter.cmd" << WEOF
-@echo off
-python -c "import sys; sys.path.insert(0, '${INSTALL_DIR}'); from porter.cli import main; main()" %*
-WEOF
-        ok "CLI installed to ${BIN_DIR}/porter.cmd"
-    else
-        cat > "$BIN_DIR/porter" << WEOF
-#!/usr/bin/env bash
-exec $PYTHON -c "import sys; sys.path.insert(0, '${INSTALL_DIR}'); from porter.cli import main; main()" "\$@"
-WEOF
-        chmod +x "$BIN_DIR/porter"
-        ok "CLI installed to ${BIN_DIR}/porter"
-    fi
-
-    # Add to PATH
-    if ! echo "$PATH" | grep -q "$BIN_DIR"; then
-        export PATH="$BIN_DIR:$PATH"
-        if ! $IS_WINDOWS_NATIVE; then
-            local SHELL_RC="$HOME/.bashrc"
-            [ -n "${ZSH_VERSION:-}" ] && SHELL_RC="$HOME/.zshrc"
-            if ! grep -q "$BIN_DIR" "$SHELL_RC" 2>/dev/null; then
-                echo "export PATH=\"$BIN_DIR:\$PATH\"" >> "$SHELL_RC"
-            fi
-        fi
-        info "Added ${BIN_DIR} to PATH"
-    fi
 }
 
 # ──────────────────────────────────────────────────────────────
@@ -848,7 +198,7 @@ generate_passcode() {
     if [ -z "$PASSCODE" ]; then
         PASSCODE=$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 6)
         if [ -z "$PASSCODE" ]; then
-            PASSCODE=$(echo "$RANDOM$(date +%s%N)" | $PYTHON -c "
+            PASSCODE=$(echo "$RANDOM$(date +%s%N)" | python3 -c "
 import sys, hashlib
 h = hashlib.sha256(sys.stdin.read().encode()).hexdigest()
 print(''.join([str(int(c, 16) % 10) for c in h[:6]]))
@@ -865,7 +215,7 @@ create_config() {
     header "Creating configuration"
 
     local passcode_hash
-    passcode_hash=$("$PYTHON" -c "import hashlib; print(hashlib.sha256('${PASSCODE}'.encode()).hexdigest())")
+    passcode_hash=$(python3 -c "import hashlib; print(hashlib.sha256('${PASSCODE}'.encode()).hexdigest())" 2>/dev/null || echo "")
 
     mkdir -p "$INSTALL_DIR"
 
@@ -884,72 +234,6 @@ EOF
 }
 
 # ──────────────────────────────────────────────────────────────
-#  Start server
-# ──────────────────────────────────────────────────────────────
-start_server() {
-    if [ "$SKIP_START" = "true" ]; then
-        info "Skipping server start (PORTER_SKIP_START=true)"
-        return
-    fi
-
-    header "Starting Porter"
-
-    # Kill any existing process on this port
-    local existing_pid
-    if command -v lsof &>/dev/null; then
-        existing_pid=$(lsof -ti:"$PORT" 2>/dev/null || true)
-    elif command -v ss &>/dev/null; then
-        existing_pid=$(ss -tlnp "sport = :$PORT" 2>/dev/null | grep -oP 'pid=\K\d+' || true)
-    fi
-    if [ -n "${existing_pid:-}" ]; then
-        warn "Port ${PORT} in use (PID ${existing_pid}), killing..."
-        kill "$existing_pid" 2>/dev/null || true
-        sleep 1
-    fi
-
-    info "Starting on port ${PORT}..."
-    cd "${INSTALL_DIR}"
-
-    # Create log file
-    touch "${INSTALL_DIR}/portal.log"
-
-    if command -v porter &>/dev/null; then
-        nohup porter server start --mode dev >> "${INSTALL_DIR}/portal.log" 2>&1 &
-    elif [ -f "${INSTALL_DIR}/run.sh" ]; then
-        nohup bash "${INSTALL_DIR}/run.sh" >> "${INSTALL_DIR}/portal.log" 2>&1 &
-    else
-        nohup "$PYTHON" "${INSTALL_DIR}/app.py" >> "${INSTALL_DIR}/portal.log" 2>&1 &
-    fi
-
-    local server_pid=$!
-    info "Server PID: ${server_pid}"
-
-    # Wait for server to be ready
-    info "Waiting for server..."
-    local waited=0
-    while [ $waited -lt 20 ]; do
-        sleep 1
-        ((waited++))
-        if "$PYTHON" -c "
-import socket
-s = socket.socket()
-s.settimeout(1)
-try:
-    s.connect(('127.0.0.1', ${PORT}))
-    s.close()
-    exit(0)
-except:
-    exit(1)
-" 2>/dev/null; then
-            ok "Server running at http://localhost:${PORT}"
-            ok "Dashboard:    http://localhost:${PORT}/setup"
-            return
-        fi
-    done
-    warn "Server may still be starting... check http://localhost:${PORT}"
-}
-
-# ──────────────────────────────────────────────────────────────
 #  Summary
 # ──────────────────────────────────────────────────────────────
 print_summary() {
@@ -963,89 +247,19 @@ print_summary() {
     info "Server URL:   http://localhost:${PORT}"
     info "Setup URL:    http://localhost:${PORT}/setup"
     info "Passcode:     ${PASSCODE}"
-    info "Log file:     ${LOG_FILE}"
     echo
-    printf "${BOLD}Quick start:${RESET}\n"
-    info "  porter gui                       Open dashboard in browser"
-    info "  porter cf connect                Connect Cloudflare account"
-    info "  porter tunnel create panel ${PORT}  Create a tunnel"
-    echo
-    printf "${BOLD}All commands:${RESET}\n"
-    info "  porter --help                    Show full help"
-    info "  porter platform                  Show platform info"
-    info "  porter server start|stop|status  Server management"
-    info "  porter server logs --follow      Watch logs"
-    echo
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Windows native installer
-# ──────────────────────────────────────────────────────────────
-install_windows() {
-    header "Installing Porter (Windows)"
-
-    PYTHON=""
-    for cmd in python python3 py; do
-        if command -v "$cmd" &>/dev/null; then
-            PYTHON="$cmd"
-            break
-        fi
-    done
-
-    if [ -z "$PYTHON" ]; then
-        die "Python not found. Install from https://python.org or run: winget install Python.Python.3.12"
+    if systemctl is-enabled porter &>/dev/null 2>&1; then
+        printf "${BOLD}Service (systemd):${RESET}\n"
+        info "  sudo systemctl status porter"
+        info "  sudo systemctl restart porter"
+        info "  sudo journalctl -u porter -f"
+    else
+        printf "${BOLD}Quick start:${RESET}\n"
+        info "  porter gui                       Open dashboard in browser"
+        info "  porter cf connect                Connect Cloudflare account"
+        info "  porter tunnel create panel ${PORT}  Create a tunnel"
     fi
-
-    ok "Python: $($PYTHON --version 2>&1)"
-
-    find_pip
-    [ -z "$PIP" ] && ensure_pip
-    detect_pip_flags
-
-    download_files
-    install_deps
-    verify_deps
-    install_cloudflared
-    install_cli
-    generate_passcode
-    create_config
-    start_server
-    print_summary
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Usage
-# ──────────────────────────────────────────────────────────────
-usage() {
-    echo "Porter — Universal Installer v2"
     echo
-    echo "Usage:"
-    echo "  Linux / macOS / Git Bash / WSL / Termux:"
-    echo "    curl -fsSL https://tinyurl.com/2ctqvyfp | bash"
-    echo
-    echo "  Windows PowerShell (two-step, most reliable):"
-    echo "    curl.exe -fsSL https://tinyurl.com/2ctqvyfp -o install.sh"
-    echo "    bash install.sh"
-    echo
-    echo "  Windows PowerShell (one-line):"
-    echo "    curl.exe -fsSL https://tinyurl.com/2ctqvyfp | bash"
-    echo
-    echo "Supported platforms:"
-    echo "  Linux (Debian/Ubuntu, RHEL/Fedora, Arch)"
-    echo "  macOS (Homebrew)"
-    echo "  Windows (Git Bash, WSL, MSYS2, PowerShell)"
-    echo "  Termux (Android)"
-    echo
-    echo "Environment variables:"
-    echo "  PORTER_DIR        Install directory (default: ~/.porter)"
-    echo "  PORTER_PORT       Server port (default: 7262)"
-    echo "  PORTER_PASSCODE   Custom 6-digit passcode (default: auto-generated)"
-    echo "  PORTER_SKIP_START Don't start server after install (default: false)"
-    echo
-    echo "Examples:"
-    echo "  curl -fsSL https://tinyurl.com/2ctqvyfp | bash"
-    echo "  curl.exe -fsSL https://tinyurl.com/2ctqvyfp -o install.sh && bash install.sh"
-    echo "  PORTER_PORT=8080 PORTER_PASSCODE=123456 curl -fsSL https://tinyurl.com/2ctqvyfp | bash"
 }
 
 # ──────────────────────────────────────────────────────────────
@@ -1053,45 +267,128 @@ usage() {
 # ──────────────────────────────────────────────────────────────
 main() {
     if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-        usage
+        echo "Porter — Universal Installer v3"
+        echo
+        echo "Usage:"
+        echo "  curl -fsSL https://tinyurl.com/2ctqvyfp | bash"
+        echo
+        echo "Environment variables:"
+        echo "  INSTALL_DIR   Install directory (default: ~/.porter)"
+        echo "  PORT          Server port (default: 7262)"
+        echo "  PASSCODE      Custom 6-digit passcode (default: auto-generated)"
+        echo
+        echo "Examples:"
+        echo "  curl -fsSL https://tinyurl.com/2ctqvyfp | bash"
+        echo "  PORT=8080 PASSCODE=123456 curl -fsSL https://tinyurl.com/2ctqvyfp | bash"
         exit 0
     fi
 
     echo
-    printf "${BOLD}Porter Installer v2${RESET}\n"
+    printf "${BOLD}Porter Installer v3${RESET}\n"
     printf "%s\n" "Cloudflare Tunnel Portal — Universal Installer"
     echo
 
-    # Init log
     echo "=== Porter install started $(date) ===" > "$LOG_FILE" 2>/dev/null || true
 
     detect_platform
+    find_downloader
+    download_files
+    generate_passcode
+    create_config
 
-    # Windows native: separate flow
-    if $IS_WINDOWS_NATIVE; then
-        install_windows
+    # ── Linux / macOS / WSL: delegate to setup.sh ──
+    if [ "$PLATFORM" = "linux" ] || [ "$PLATFORM" = "wsl" ] || [ "$PLATFORM" = "macos" ]; then
+        header "Running setup.sh"
+        info "Delegating to setup.sh for system setup..."
+        echo
+
+        export PORT
+        export INSTALL_DIR
+
+        # setup.sh handles: system deps, cloudflared, python deps, systemd, start
+        if bash "${INSTALL_DIR}/setup.sh"; then
+            echo
+            print_summary
+        else
+            warn "setup.sh exited with errors. Falling back to manual start..."
+            cd "${INSTALL_DIR}"
+            if command -v gunicorn &>/dev/null; then
+                nohup gunicorn --bind "0.0.0.0:$PORT" --workers 2 --worker-class gevent --timeout 120 --preload app:app >> "${INSTALL_DIR}/portal.log" 2>&1 &
+            else
+                nohup python3 app.py >> "${INSTALL_DIR}/portal.log" 2>&1 &
+            fi
+            ok "Server started manually on port ${PORT}"
+            print_summary
+        fi
         return
     fi
 
-    # Check for git
-    if command -v git &>/dev/null; then
-        HAS_GIT=true
-        ok "git available"
+    # ── Termux / Windows: handle natively (no systemd) ──
+    header "Installing dependencies"
+
+    # Find Python
+    PYTHON=""
+    for cmd in python3 python; do
+        if command -v "$cmd" &>/dev/null && "$cmd" -c "import sys; assert sys.version_info >= (3, 8)" 2>/dev/null; then
+            PYTHON="$cmd"
+            break
+        fi
+    done
+    [ -n "$PYTHON" ] || die "Python 3.8+ not found"
+    ok "Python: $($PYTHON --version 2>&1)"
+
+    # Install deps
+    cd "${INSTALL_DIR}"
+    if $IS_TERMUX; then
+        $PYTHON -m pip install flask httpx --user --quiet 2>/dev/null || \
+        $PYTHON -m pip install flask httpx --quiet 2>/dev/null || true
+    else
+        $PYTHON -m pip install -r requirements.txt --break-system-packages --quiet 2>/dev/null || \
+        $PYTHON -m pip install -r requirements.txt --user --quiet 2>/dev/null || \
+        $PYTHON -m pip install -r requirements.txt --quiet 2>/dev/null || true
     fi
 
-    find_downloader
-    ensure_python
-    ensure_pip
-    detect_pip_flags
+    # Verify
+    if $PYTHON -c "import flask, httpx" 2>/dev/null; then
+        ok "Dependencies installed"
+    else
+        die "Failed to install dependencies"
+    fi
 
-    download_files
-    install_deps
-    verify_deps
-    install_cloudflared
-    install_cli
-    generate_passcode
-    create_config
-    start_server
+    # Install cloudflared
+    if ! command -v cloudflared &>/dev/null; then
+        info "Installing cloudflared..."
+        local cf_url
+        case "$ARCH" in
+            arm64) cf_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64" ;;
+            arm)   cf_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm" ;;
+            *)     cf_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" ;;
+        esac
+        download_file "$cf_url" "$HOME/.local/bin/cloudflared" && \
+        chmod +x "$HOME/.local/bin/cloudflared" && \
+        export PATH="$HOME/.local/bin:$PATH" && \
+        ok "cloudflared installed" || warn "cloudflared install failed (optional for dev mode)"
+    else
+        ok "cloudflared already installed"
+    fi
+
+    # Start server
+    header "Starting Porter"
+    if command -v gunicorn &>/dev/null; then
+        nohup gunicorn --bind "0.0.0.0:$PORT" --workers 2 --worker-class gevent --timeout 120 --preload app:app >> "${INSTALL_DIR}/portal.log" 2>&1 &
+    else
+        nohup $PYTHON app.py >> "${INSTALL_DIR}/portal.log" 2>&1 &
+    fi
+
+    local pid=$!
+    sleep 2
+
+    if kill -0 "$pid" 2>/dev/null; then
+        ok "Server running at http://localhost:${PORT}"
+    else
+        warn "Server may have failed to start. Check: ${INSTALL_DIR}/portal.log"
+    fi
+
     print_summary
 }
 

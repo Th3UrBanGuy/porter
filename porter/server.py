@@ -51,20 +51,21 @@ def _is_running(pid):
     return is_pid_running(pid)
 
 
-def _wait_for_port(port, timeout=15):
+def _wait_for_port(port, timeout=30):
     """Block until the port is accepting connections."""
     import socket
     deadline = time.time() + timeout
     while time.time() < deadline:
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(1)
-            result = sock.connect_ex(("127.0.0.1", port))
-            sock.close()
-            if result == 0:
-                return True
-        except Exception:
-            pass
+        for host in ("0.0.0.0", "127.0.0.1"):
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(1)
+                result = sock.connect_ex((host, port))
+                sock.close()
+                if result == 0:
+                    return True
+            except Exception:
+                pass
         time.sleep(0.5)
     return False
 
@@ -97,6 +98,16 @@ def start(port=None, mode="prod", workers=2, force=False):
         out.warning(f"Server already running (PID {pid})")
         out.info(f"  URL: http://localhost:{port}")
         return True
+
+    # Kill any stale process occupying the port
+    stale_pid = find_pid_by_port(port)
+    if stale_pid and stale_pid != pid:
+        out.warning(f"Killing stale process on port {port} (PID {stale_pid})...")
+        try:
+            kill_pid(stale_pid, force=True)
+            time.sleep(1)
+        except Exception:
+            pass
 
     out.info(f"Starting Porter on port {port} ({OS_NAME})...")
 

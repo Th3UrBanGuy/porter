@@ -53,10 +53,26 @@
   .btn-ghost{background:var(--surface);border:1px solid var(--border);color:var(--text);backdrop-filter:blur(12px)}
   .btn-ghost:hover{border-color:var(--accent);color:var(--accent);text-decoration:none}
 
-  .hero-code{margin-top:40px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:inline-block;font-family:'SF Mono',Monaco,monospace;font-size:14px;color:var(--text);backdrop-filter:blur(12px);transition:var(--transition);position:relative}
+  .hero-code{margin-top:40px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:inline-block;font-family:'SF Mono',Monaco,monospace;font-size:14px;color:var(--text);backdrop-filter:blur(12px);transition:var(--transition);position:relative;text-align:left}
   .hero-code .prompt{color:var(--accent)}
   .hero-code .cmd{color:var(--text)}
   .hero-code .comment{color:var(--text3)}
+  .cmd-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;transition:background .15s}
+  .cmd-row:hover{background:var(--surface2)}
+  .cmd-row .prompt{color:var(--accent);flex-shrink:0}
+  .cmd-row .cmd{flex:1;white-space:nowrap;overflow-x:auto}
+  .cmd-row .copy-inline{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--text3);cursor:pointer;transition:all .15s;flex-shrink:0;font-family:inherit}
+  .cmd-row .copy-inline:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .cmd-row .copy-inline.copied{background:#16a34a;color:#fff;border-color:#16a34a}
+  .cmd-label{font-size:12px;color:var(--text3);padding:4px 12px 0;font-family:var(--font);display:flex;align-items:center;gap:6px}
+  .cmd-label .tag{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:10px;color:var(--text3);font-weight:600}
+  .install-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:24px}
+  .install-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;backdrop-filter:blur(12px);transition:var(--transition)}
+  .install-card:hover{border-color:var(--accent)}
+  .install-card h4{font-size:14px;font-weight:700;margin-bottom:4px}
+  .install-card p{font-size:12px;color:var(--text3);margin-bottom:14px}
+  .install-card pre{margin:0;padding:12px 14px;font-size:12px;border-radius:8px;position:relative}
+  .install-card .copy-btn{position:absolute;top:8px;right:8px;padding:4px 10px;font-size:11px}
   .copy-btn{position:absolute;top:10px;right:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--text2);cursor:pointer;font-family:inherit;transition:var(--transition);display:flex;align-items:center;gap:5px}
   .copy-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
   .copy-btn.copied{background:#16a34a;color:#fff;border-color:#16a34a}
@@ -181,10 +197,24 @@
       <a href="#features" class="btn btn-ghost">Learn More</a>
     </div>
     <div class="hero-code">
-      <button class="copy-btn" onclick="copyCmd(this, 'curl -fsSL https://tinyurl.com/2ctqvyfp | bash')">&#128203; Copy</button>
-      <span class="comment"># One-line install (Linux, macOS, Windows, Termux)</span><br>
-      <span class="prompt">$</span> <span class="cmd">curl -fsSL https://tinyurl.com/2ctqvyfp | bash</span>
-      <span style="color:#6b7280;font-size:13px;display:block;margin-top:4px">Windows: <code style="color:#f97316">curl.exe -fsSL ... -o install.sh && bash install.sh</code></span>
+      <div class="cmd-label">Linux / macOS / Termux <span class="tag">1-click</span></div>
+      <div class="cmd-row">
+        <span class="prompt">$</span>
+        <span class="cmd">curl -fsSL https://tinyurl.com/2ctqvyfp | bash</span>
+        <button class="copy-inline" onclick="copyCmd(this, 'curl -fsSL https://tinyurl.com/2ctqvyfp | bash')">Copy</button>
+      </div>
+      <div class="cmd-label">Windows PowerShell</div>
+      <div class="cmd-row">
+        <span class="prompt">$</span>
+        <span class="cmd">curl.exe -fsSL https://tinyurl.com/2ctqvyfp -o install.sh && bash install.sh</span>
+        <button class="copy-inline" onclick="copyCmd(this, 'curl.exe -fsSL https://tinyurl.com/2ctqvyfp -o install.sh && bash install.sh')">Copy</button>
+      </div>
+      <div class="cmd-label">VPS / Server</div>
+      <div class="cmd-row">
+        <span class="prompt">$</span>
+        <span class="cmd">git clone https://github.com/Th3UrBanGuy/porter.git && cd porter && bash setup.sh</span>
+        <button class="copy-inline" onclick="copyCmd(this, 'git clone https://github.com/Th3UrBanGuy/porter.git && cd porter && bash setup.sh')">Copy</button>
+      </div>
     </div>
   </div>
 </section>
@@ -196,13 +226,18 @@
   <div class="container">
     <div class="section-title">
       <h2>Works Everywhere</h2>
-      <p>One installer, one command. Runs on any platform with Python.</p>
+      <p>One installer, one command. Runs on any platform with Python — including VPS and servers.</p>
     </div>
     <div class="platforms">
       <div class="platform-card">
         <div class="platform-icon">&#127987;</div>
         <h3>Linux</h3>
         <p>Debian, Ubuntu, RHEL, Fedora, Arch. Auto-detects package manager.</p>
+      </div>
+      <div class="platform-card">
+        <div class="platform-icon">&#128187;</div>
+        <h3>VPS / Server</h3>
+        <p>Systemd service. Auto-start on boot. One-command setup.</p>
       </div>
       <div class="platform-card">
         <div class="platform-icon">&#127823;</div>
@@ -237,7 +272,7 @@
       <div class="stat"><div class="stat-num">0</div><div class="stat-label">API Tokens</div></div>
       <div class="stat"><div class="stat-num">1</div><div class="stat-label">Click Deploy</div></div>
       <div class="stat"><div class="stat-num">5s</div><div class="stat-label">Deploy Time</div></div>
-      <div class="stat"><div class="stat-num">4</div><div class="stat-label">Platforms</div></div>
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Platforms</div></div>
     </div>
 
     <div class="features">
@@ -390,20 +425,30 @@
       <p>One command. Everything handled automatically.</p>
     </div>
 
-    <pre><button class="copy-btn" onclick="copyCmd(this, 'curl -fsSL https://tinyurl.com/2ctqvyfp | bash')">&#128203; Copy</button><code><span style="color:var(--text3)"># Linux, macOS, WSL, Termux</span>
-<span style="color:var(--accent)">$</span> curl -fsSL https://tinyurl.com/2ctqvyfp | bash
-
-<span style="color:var(--text3)"># Windows PowerShell (two-step, most reliable)</span>
-<span style="color:var(--accent)">$</span> curl.exe -fsSL https://tinyurl.com/2ctqvyfp -o install.sh
-<span style="color:var(--accent)">$</span> bash install.sh
-
-<span style="color:var(--text3)"># With custom port and passcode</span>
-<span style="color:var(--accent)">$</span> PORTER_PORT=8080 PORTER_PASSCODE=123456 curl -fsSL https://tinyurl.com/2ctqvyfp | bash
-
-<span style="color:var(--text3)"># Manual install</span>
-<span style="color:var(--accent)">$</span> git clone https://github.com/Th3UrBanGuy/porter.git
-<span style="color:var(--accent)">$</span> cd porter && pip install -r requirements.txt && pip install -e .
-<span style="color:var(--accent)">$</span> porter gui</code></pre>
+    <div class="install-cards">
+      <div class="install-card">
+        <h4>&#127987; Linux / macOS / Termux</h4>
+        <p>One-line install. Auto-detects platform.</p>
+        <pre><button class="copy-btn" onclick="copyCmd(this, 'curl -fsSL https://tinyurl.com/2ctqvyfp | bash')">&#128203; Copy</button><code><span style="color:var(--accent)">$</span> curl -fsSL https://tinyurl.com/2ctqvyfp | bash</code></pre>
+      </div>
+      <div class="install-card">
+        <h4>&#128187; Windows PowerShell</h4>
+        <p>Two-step install. Most reliable on Windows.</p>
+        <pre><button class="copy-btn" onclick="copyCmd(this, 'curl.exe -fsSL https://tinyurl.com/2ctqvyfp -o install.sh && bash install.sh')">&#128203; Copy</button><code><span style="color:var(--accent)">$</span> curl.exe -fsSL https://tinyurl.com/2ctqvyfp -o install.sh
+<span style="color:var(--accent)">$</span> bash install.sh</code></pre>
+      </div>
+      <div class="install-card">
+        <h4>&#128187; VPS / Server</h4>
+        <p>Systemd service. Auto-start on boot.</p>
+        <pre><button class="copy-btn" onclick="copyCmd(this, 'git clone https://github.com/Th3UrBanGuy/porter.git && cd porter && bash setup.sh')">&#128203; Copy</button><code><span style="color:var(--accent)">$</span> git clone https://github.com/Th3UrBanGuy/porter.git
+<span style="color:var(--accent)">$</span> cd porter && bash setup.sh</code></pre>
+      </div>
+      <div class="install-card">
+        <h4>&#9889; Custom Port</h4>
+        <p>Override the default port.</p>
+        <pre><button class="copy-btn" onclick="copyCmd(this, 'PORT=8080 bash setup.sh')">&#128203; Copy</button><code><span style="color:var(--accent)">$</span> PORT=8080 bash setup.sh</code></pre>
+      </div>
+    </div>
 
     <div class="stats">
       <div class="stat"><div class="stat-num">~30s</div><div class="stat-label">Install Time</div></div>
