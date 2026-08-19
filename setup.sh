@@ -237,6 +237,56 @@ start_service() {
     fi
 }
 
+# ── Start localhost.run tunnel ───────────────────────────────
+start_tunnel() {
+    if ! command -v ssh &>/dev/null; then
+        warn "ssh not found, skipping tunnel"
+        return
+    fi
+
+    info "Opening public tunnel via localhost.run..."
+
+    # Kill any existing tunnel on this port
+    local tunnel_pid
+    tunnel_pid=$(cat "${INSTALL_DIR}/.tunnel.pid" 2>/dev/null || true)
+    if [ -n "${tunnel_pid:-}" ] && kill -0 "${tunnel_pid}" 2>/dev/null; then
+        kill "${tunnel_pid}" 2>/dev/null || true
+        sleep 1
+    fi
+
+    # Start tunnel in background, capture URL from stderr
+    ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 \
+        -R 80:localhost:${PORT} localhost.run \
+        > "${INSTALL_DIR}/.tunnel.log" 2>&1 &
+    local tunnel_pid=$!
+    echo "$tunnel_pid" > "${INSTALL_DIR}/.tunnel.pid"
+
+    # Wait for the URL to appear
+    local waited=0
+    local tunnel_url=""
+    while [ $waited -lt 15 ]; do
+        sleep 1
+        waited=$((waited + 1))
+        tunnel_url=$(grep -oP 'https://[a-zA-Z0-9.-]+\.lhr\.life' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
+        if [ -z "$tunnel_url" ]; then
+            tunnel_url=$(grep -oP 'https://[a-zA-Z0-9.-]+\.localhost\.run' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
+        fi
+        if [ -n "$tunnel_url" ]; then
+            break
+        fi
+    done
+
+    if [ -n "$tunnel_url" ]; then
+        echo "$tunnel_url" > "${INSTALL_DIR}/.tunnel_url"
+        ok "Public URL: ${tunnel_url}"
+        ok "Dashboard:  ${tunnel_url}/setup"
+    else
+        warn "Tunnel started but URL not captured yet"
+        info "Check: cat ${INSTALL_DIR}/.tunnel.log"
+        info "Or run: ssh -R 80:localhost:${PORT} localhost.run"
+    fi
+}
+
 # ── Main ─────────────────────────────────────────────────────
 main() {
     echo
@@ -249,6 +299,7 @@ main() {
     install_python_deps
     create_service
     start_service
+    start_tunnel
 
     echo
     printf "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}\n"
@@ -258,6 +309,15 @@ main() {
     info "URL:      http://localhost:${PORT}"
     info "Setup:    http://localhost:${PORT}/setup"
     info "Port:     ${PORT}"
+    # Show tunnel URL if available
+    if [ -f "${INSTALL_DIR}/.tunnel_url" ]; then
+        local public_url
+        public_url=$(cat "${INSTALL_DIR}/.tunnel_url" 2>/dev/null || true)
+        if [ -n "${public_url:-}" ]; then
+            info "Public:   ${public_url}"
+            info "Dashboard: ${public_url}/setup"
+        fi
+    fi
     echo
     if has_systemd; then
         info "Service:  sudo systemctl status ${SERVICE_NAME}"

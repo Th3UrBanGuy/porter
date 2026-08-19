@@ -231,6 +231,45 @@ EOF
 }
 
 # ──────────────────────────────────────────────────────────────
+#  Start localhost.run tunnel
+# ──────────────────────────────────────────────────────────────
+start_tunnel() {
+    if ! command -v ssh &>/dev/null; then
+        warn "ssh not found, skipping tunnel"
+        return
+    fi
+
+    info "Opening public tunnel via localhost.run..."
+
+    ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 \
+        -R 80:localhost:${PORT} localhost.run \
+        > "${INSTALL_DIR}/.tunnel.log" 2>&1 &
+    local tunnel_pid=$!
+    echo "$tunnel_pid" > "${INSTALL_DIR}/.tunnel.pid"
+
+    local waited=0
+    local tunnel_url=""
+    while [ $waited -lt 15 ]; do
+        sleep 1
+        waited=$((waited + 1))
+        tunnel_url=$(grep -oP 'https://[a-zA-Z0-9.-]+\.lhr\.life' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
+        if [ -z "$tunnel_url" ]; then
+            tunnel_url=$(grep -oP 'https://[a-zA-Z0-9.-]+\.localhost\.run' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
+        fi
+        [ -n "$tunnel_url" ] && break
+    done
+
+    if [ -n "$tunnel_url" ]; then
+        echo "$tunnel_url" > "${INSTALL_DIR}/.tunnel_url"
+        ok "Public URL: ${tunnel_url}"
+        ok "Dashboard:  ${tunnel_url}/setup"
+    else
+        warn "Tunnel started but URL not captured"
+        info "Check: cat ${INSTALL_DIR}/.tunnel.log"
+    fi
+}
+
+# ──────────────────────────────────────────────────────────────
 #  Summary
 # ──────────────────────────────────────────────────────────────
 print_summary() {
@@ -244,6 +283,15 @@ print_summary() {
     info "Server URL:   http://localhost:${PORT}"
     info "Setup URL:    http://localhost:${PORT}/setup"
     info "Passcode:     ${PASSCODE}"
+    # Show tunnel URL if available
+    if [ -f "${INSTALL_DIR}/.tunnel_url" ]; then
+        local public_url
+        public_url=$(cat "${INSTALL_DIR}/.tunnel_url" 2>/dev/null || true)
+        if [ -n "${public_url:-}" ]; then
+            info "Public URL:   ${public_url}"
+            info "Dashboard:    ${public_url}/setup"
+        fi
+    fi
     echo
     if systemctl is-enabled porter &>/dev/null 2>&1; then
         printf "${BOLD}Service (systemd):${RESET}\n"
@@ -308,6 +356,7 @@ main() {
                 nohup python3 app.py >> "${INSTALL_DIR}/portal.log" 2>&1 &
             fi
             ok "Server started manually on port ${PORT}"
+            start_tunnel
             print_summary
         fi
         return
@@ -375,6 +424,7 @@ main() {
 
     if kill -0 "$pid" 2>/dev/null; then
         ok "Server running at http://localhost:${PORT}"
+        start_tunnel
     else
         warn "Server may have failed to start. Check: ${INSTALL_DIR}/portal.log"
     fi
