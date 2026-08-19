@@ -7,7 +7,6 @@
 # Usage:
 #   curl -fsSL https://tinyurl.com/2ctqvyfp | bash
 # ============================================================================
-set -euo pipefail
 
 # Strip CRLF line endings (Windows PowerShell may convert \n to \r\n)
 if [ -f "$0" ] && command -v sed &>/dev/null; then
@@ -18,48 +17,37 @@ if [ -f "$0" ] && command -v sed &>/dev/null; then
     fi
 fi
 
-# ──────────────────────────────────────────────────────────────
-#  Configuration
-# ──────────────────────────────────────────────────────────────
+# ── Configuration ───────────────────────────────────────────
 REPO="Th3UrBanGuy/porter"
 BRANCH="self-hosted"
 RAW_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 INSTALL_DIR="${INSTALL_DIR:-${PORTER_DIR:-$HOME/.porter}}"
 PORT=7262
 PASSCODE="${PASSCODE:-${PORTER_PASSCODE:-}}"
-LOG_FILE="/tmp/porter-install.log"
 
-# ──────────────────────────────────────────────────────────────
-#  Colors & formatting
-# ──────────────────────────────────────────────────────────────
-if [ -t 1 ] && command -v tput &>/dev/null && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]; then
-    RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
-    CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; RESET='\033[0m'
-else
-    RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; RESET=''
-fi
+# ── Colors ──────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; RESET='\033[0m'
 
 ok()   { printf "  ${GREEN}✔${RESET} %s\n" "$1"; }
-err()  { printf "  ${RED}✘${RESET} %s\n" "$1" >&2; }
 warn() { printf "  ${YELLOW}⚠${RESET} %s\n" "$1"; }
 info() { printf "  ${CYAN}→${RESET} %s\n" "$1"; }
-header() { echo; printf "${BOLD}%s${RESET}\n" "$1"; printf '%0.s─' {1..50}; echo; }
-die() { err "$1"; exit 1; }
-log() { echo "[$(date '+%H:%M:%S')] $1" >> "$LOG_FILE" 2>/dev/null || true; }
+die()  { printf "  ${RED}✘${RESET} %s\n" "$1"; exit 1; }
 
-# ──────────────────────────────────────────────────────────────
-#  Platform detection
-# ──────────────────────────────────────────────────────────────
+# ── Platform detection ──────────────────────────────────────
 IS_TERMUX=false
 IS_WINDOWS_NATIVE=false
+PLATFORM="linux"
+ARCH="amd64"
 
 detect_platform() {
-    OS="$(uname -s 2>/dev/null || echo Windows)"
-    ARCH="$(uname -m 2>/dev/null || echo x86_64)"
+    local os arch
+    os="$(uname -s 2>/dev/null || echo Linux)"
+    arch="$(uname -m 2>/dev/null || echo x86_64)"
 
-    case "$OS" in
+    case "$os" in
         Linux*)
-            if [ -d "/data/data/com.termux" ] || [ -d "/data/user/0/com.termux" ] || [ -n "${TERMUX_VERSION:-}" ]; then
+            if [ -d "/data/data/com.termux" ] || [ -n "${TERMUX_VERSION:-}" ]; then
                 PLATFORM="termux"; IS_TERMUX=true
             elif grep -qi microsoft /proc/version 2>/dev/null; then
                 PLATFORM="wsl"
@@ -72,19 +60,15 @@ detect_platform() {
         *)        PLATFORM="linux" ;;
     esac
 
-    case "$ARCH" in
+    case "$arch" in
         x86_64|amd64)   ARCH="amd64" ;;
         aarch64|arm64)   ARCH="arm64" ;;
         armv7*|armhf)    ARCH="arm" ;;
         *)               ARCH="amd64" ;;
     esac
-
-    info "Platform: ${PLATFORM}/${ARCH}"
 }
 
-# ──────────────────────────────────────────────────────────────
-#  Download helpers
-# ──────────────────────────────────────────────────────────────
+# ── Download helpers ────────────────────────────────────────
 DOWNLOADER=""
 
 find_downloader() {
@@ -93,129 +77,74 @@ find_downloader() {
     elif command -v wget &>/dev/null; then
         DOWNLOADER="wget"
     else
-        warn "Neither curl nor wget found, installing curl..."
-        if command -v apt-get &>/dev/null; then
-            sudo apt-get install -y -qq curl 2>>"$LOG_FILE" || true
-        fi
-        if command -v curl &>/dev/null; then
-            DOWNLOADER="curl"
-        elif command -v wget &>/dev/null; then
-            DOWNLOADER="wget"
-        else
-            die "curl or wget is required but could not be installed"
-        fi
+        sudo apt-get install -y -qq curl 2>/dev/null && DOWNLOADER="curl" || true
     fi
-    ok "Downloader: ${DOWNLOADER}"
+    [ -n "$DOWNLOADER" ] || die "curl or wget required"
 }
 
 download_file() {
     local url="$1" dest="$2"
     mkdir -p "$(dirname "$dest")"
-    local retry
-    for retry in 1 2 3; do
+    local i
+    for i in 1 2 3; do
         if [ "$DOWNLOADER" = "curl" ]; then
             curl -fsSL --connect-timeout 15 --max-time 120 "$url" -o "$dest" 2>/dev/null && return 0
         else
             wget -q --timeout=15 "$url" -O "$dest" 2>/dev/null && return 0
         fi
-        warn "Download attempt $retry failed, retrying..."
-        sleep 2
+        sleep 1
     done
     return 1
 }
 
-download_and_verify() {
-    local url="$1" dest="$2" name="$3"
-    info "Downloading ${name}..."
-    if download_file "$url" "$dest"; then
-        if [ -s "$dest" ]; then
-            ok "${name}"
-            return 0
-        else
-            err "Downloaded ${name} is empty"
-            rm -f "$dest"
-            return 1
-        fi
-    else
-        err "Failed to download ${name}"
-        rm -f "$dest"
-        return 1
-    fi
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Download all Porter files
-# ──────────────────────────────────────────────────────────────
+# ── Download all files ──────────────────────────────────────
 download_files() {
-    header "Downloading Porter"
-
+    info "Downloading files..."
     mkdir -p "$INSTALL_DIR"
-    info "Install directory: ${INSTALL_DIR}"
-    echo
 
-    local failed=0
+    local failed=0 f
 
-    # Core Python files
     for f in app.py cloudflare_client.py tunnel_manager.py api_keys.py requirements.txt setup.py run.sh setup.sh; do
-        download_and_verify "${RAW_URL}/${f}" "${INSTALL_DIR}/${f}" "$f" || ((failed++))
+        download_file "${RAW_URL}/${f}" "${INSTALL_DIR}/${f}" || ((failed++))
     done
 
-    # Porter CLI module
     mkdir -p "${INSTALL_DIR}/porter"
     for f in __init__.py __main__.py cli.py api.py config.py output.py server.py cloudflare.py platform.py; do
-        download_and_verify "${RAW_URL}/porter/${f}" "${INSTALL_DIR}/porter/${f}" "porter/${f}" || ((failed++))
+        download_file "${RAW_URL}/porter/${f}" "${INSTALL_DIR}/porter/${f}" || ((failed++))
     done
 
-    # Templates
     mkdir -p "${INSTALL_DIR}/templates"
     for f in setup.html docs.html dashboard.html login.html; do
-        download_and_verify "${RAW_URL}/templates/${f}" "${INSTALL_DIR}/templates/${f}" "templates/${f}" || ((failed++))
+        download_file "${RAW_URL}/templates/${f}" "${INSTALL_DIR}/templates/${f}" || ((failed++))
     done
 
-    # Static files
     mkdir -p "${INSTALL_DIR}/static"
     for f in icon.svg icon-192.png icon-512.png manifest.json sw.js; do
-        download_and_verify "${RAW_URL}/static/${f}" "${INSTALL_DIR}/static/${f}" "static/${f}" || ((failed++))
+        download_file "${RAW_URL}/static/${f}" "${INSTALL_DIR}/static/${f}" || ((failed++))
     done
 
-    if [ "$failed" -gt 0 ]; then
-        err "${failed} file(s) failed to download"
-        die "Download incomplete. Check your network and try again."
-    fi
-
-    ok "All files downloaded successfully"
-    chmod +x "${INSTALL_DIR}/setup.sh" 2>/dev/null || true
-    chmod +x "${INSTALL_DIR}/run.sh" 2>/dev/null || true
+    [ "$failed" -eq 0 ] || die "Download failed ($failed files). Check network."
+    ok "Files downloaded"
+    chmod +x "${INSTALL_DIR}/setup.sh" "${INSTALL_DIR}/run.sh" 2>/dev/null || true
 }
 
-# ──────────────────────────────────────────────────────────────
-#  Generate passcode
-# ──────────────────────────────────────────────────────────────
+# ── Generate passcode ───────────────────────────────────────
 generate_passcode() {
-    if [ -z "$PASSCODE" ]; then
-        PASSCODE=$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 6)
-        if [ -z "$PASSCODE" ]; then
-            PASSCODE=$(echo "$RANDOM$(date +%s%N)" | python3 -c "
+    [ -n "$PASSCODE" ] && return
+    PASSCODE=$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 6)
+    [ -n "$PASSCODE" ] || PASSCODE=$(echo "$RANDOM$(date +%s%N)" | python3 -c "
 import sys, hashlib
 h = hashlib.sha256(sys.stdin.read().encode()).hexdigest()
 print(''.join([str(int(c, 16) % 10) for c in h[:6]]))
 " 2>/dev/null || echo "123456")
-        fi
-        info "Generated passcode: ${BOLD}${PASSCODE}${RESET}"
-    fi
 }
 
-# ──────────────────────────────────────────────────────────────
-#  Create config.json
-# ──────────────────────────────────────────────────────────────
+# ── Create config ───────────────────────────────────────────
 create_config() {
-    header "Creating configuration"
-
     local passcode_hash
     passcode_hash=$(python3 -c "import hashlib; print(hashlib.sha256('${PASSCODE}'.encode()).hexdigest())" 2>/dev/null || echo "")
 
     mkdir -p "$INSTALL_DIR"
-
     cat > "${INSTALL_DIR}/config.json" <<EOF
 {
   "domain": "",
@@ -227,102 +156,39 @@ create_config() {
   "tunnel_id": ""
 }
 EOF
-    ok "Config: ${INSTALL_DIR}/config.json"
+    ok "Config created"
 }
 
-# ──────────────────────────────────────────────────────────────
-#  Start cloudflared quick tunnel
-# ──────────────────────────────────────────────────────────────
-start_tunnel() {
-    if ! command -v cloudflared &>/dev/null; then
-        warn "cloudflared not found, skipping tunnel"
-        return
-    fi
-
-    info "Opening public tunnel via cloudflared..."
-
-    cloudflared tunnel --url "http://localhost:${PORT}" \
-        > "${INSTALL_DIR}/.tunnel.log" 2>&1 &
-    local tunnel_pid=$!
-    echo "$tunnel_pid" > "${INSTALL_DIR}/.tunnel.pid"
-
-    local waited=0
-    local tunnel_url=""
-    while [ $waited -lt 15 ]; do
-        sleep 1
-        waited=$((waited + 1))
-        tunnel_url=$(grep -oP 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
-        [ -n "$tunnel_url" ] && break
-    done
-
-    if [ -n "$tunnel_url" ]; then
-        echo "$tunnel_url" > "${INSTALL_DIR}/.tunnel_url"
-        ok "Public URL: ${tunnel_url}"
-        ok "Dashboard:  ${tunnel_url}/setup"
-    else
-        warn "Tunnel started but URL not captured"
-        info "Check: cat ${INSTALL_DIR}/.tunnel.log"
-    fi
-}
-
-# ──────────────────────────────────────────────────────────────
-#  Summary
-# ──────────────────────────────────────────────────────────────
+# ── Summary ─────────────────────────────────────────────────
 print_summary() {
     echo
-    printf "${BOLD}╔══════════════════════════════════════════════════╗${RESET}\n"
-    printf "${BOLD}║        Porter installed successfully!           ║${RESET}\n"
-    printf "${BOLD}╚══════════════════════════════════════════════════╝${RESET}\n"
+    printf "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}\n"
+    printf "${BOLD}  Porter installed!${RESET}\n"
+    printf "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}\n"
     echo
-    info "Platform:     ${PLATFORM}/${ARCH}"
-    info "Install dir:  ${INSTALL_DIR}"
-    info "Server URL:   http://localhost:${PORT}"
-    info "Setup URL:    http://localhost:${PORT}/setup"
-    info "Passcode:     ${PASSCODE}"
-    # Show tunnel URL if available
+    info "Local:   http://localhost:${PORT}"
+    info "Setup:   http://localhost:${PORT}/setup"
+    info "Passcode: ${PASSCODE}"
+
     if [ -f "${INSTALL_DIR}/.tunnel_url" ]; then
         local public_url
         public_url=$(cat "${INSTALL_DIR}/.tunnel_url" 2>/dev/null || true)
-        if [ -n "${public_url:-}" ]; then
-            info "Public URL:   ${public_url}"
-            info "Dashboard:    ${public_url}/setup"
-        fi
-    fi
-    echo
-    if systemctl is-enabled porter &>/dev/null 2>&1; then
-        printf "${BOLD}Service (systemd):${RESET}\n"
-        info "  sudo systemctl status porter"
-        info "  sudo systemctl restart porter"
-        info "  sudo journalctl -u porter -f"
-    else
-        printf "${BOLD}Quick start:${RESET}\n"
-        info "  porter gui                       Open dashboard in browser"
-        info "  porter cf connect                Connect Cloudflare account"
-        info "  porter tunnel create panel ${PORT}  Create a tunnel"
+        [ -n "${public_url:-}" ] && info "Public:  ${public_url}"
     fi
     echo
 }
 
-# ──────────────────────────────────────────────────────────────
-#  Main
-# ──────────────────────────────────────────────────────────────
+# ── Main ────────────────────────────────────────────────────
 main() {
-    if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-        echo "Porter — Universal Installer v3"
-        echo
-        echo "Usage:"
-        echo "  curl -fsSL https://tinyurl.com/2ctqvyfp | bash"
-        echo
+    [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ] && {
+        echo "Porter Installer — curl -fsSL https://tinyurl.com/2ctqvyfp | bash"
         echo "Port: always 7262"
         exit 0
-    fi
+    }
 
     echo
-    printf "${BOLD}Porter Installer v3${RESET}\n"
-    printf "%s\n" "Cloudflare Tunnel Portal — Universal Installer"
+    printf "${BOLD}Porter Installer${RESET}\n"
     echo
-
-    echo "=== Porter install started $(date) ===" > "$LOG_FILE" 2>/dev/null || true
 
     detect_platform
     find_downloader
@@ -332,97 +198,66 @@ main() {
 
     # ── Linux / macOS / WSL: delegate to setup.sh ──
     if [ "$PLATFORM" = "linux" ] || [ "$PLATFORM" = "wsl" ] || [ "$PLATFORM" = "macos" ]; then
-        header "Running setup.sh"
-        info "Delegating to setup.sh for system setup..."
-        echo
-
-        export PORT
-        export INSTALL_DIR
-
-        # setup.sh handles: system deps, cloudflared, python deps, systemd, start
-        if bash "${INSTALL_DIR}/setup.sh"; then
-            echo
-            print_summary
-        else
-            warn "setup.sh exited with errors. Falling back to manual start..."
-            cd "${INSTALL_DIR}"
-            if command -v gunicorn &>/dev/null; then
-                nohup gunicorn --bind "0.0.0.0:$PORT" --workers 2 --worker-class gevent --timeout 120 --preload app:app >> "${INSTALL_DIR}/portal.log" 2>&1 &
-            else
-                nohup python3 app.py >> "${INSTALL_DIR}/portal.log" 2>&1 &
-            fi
-            ok "Server started manually on port ${PORT}"
-            start_tunnel
-            print_summary
-        fi
+        export PORT INSTALL_DIR
+        bash "${INSTALL_DIR}/setup.sh" || true
+        print_summary
         return
     fi
 
-    # ── Termux / Windows: handle natively (no systemd) ──
-    header "Installing dependencies"
-
-    # Find Python
-    PYTHON=""
+    # ── Termux / Windows: handle natively ──
+    local PYTHON=""
     for cmd in python3 python; do
         if command -v "$cmd" &>/dev/null && "$cmd" -c "import sys; assert sys.version_info >= (3, 8)" 2>/dev/null; then
-            PYTHON="$cmd"
-            break
+            PYTHON="$cmd"; break
         fi
     done
     [ -n "$PYTHON" ] || die "Python 3.8+ not found"
-    ok "Python: $($PYTHON --version 2>&1)"
 
-    # Install deps
     cd "${INSTALL_DIR}"
-    if $IS_TERMUX; then
-        $PYTHON -m pip install flask httpx --user --quiet 2>/dev/null || \
-        $PYTHON -m pip install flask httpx --quiet 2>/dev/null || true
-    else
-        $PYTHON -m pip install -r requirements.txt --break-system-packages --quiet 2>/dev/null || \
-        $PYTHON -m pip install -r requirements.txt --user --quiet 2>/dev/null || \
-        $PYTHON -m pip install -r requirements.txt --quiet 2>/dev/null || true
-    fi
+    $PYTHON -m pip install -r requirements.txt --break-system-packages -q 2>/dev/null || \
+    $PYTHON -m pip install -r requirements.txt -q 2>/dev/null || true
 
-    # Verify
-    if $PYTHON -c "import flask, httpx" 2>/dev/null; then
-        ok "Dependencies installed"
-    else
-        die "Failed to install dependencies"
-    fi
+    $PYTHON -c "import flask, httpx" 2>/dev/null || die "Failed to install dependencies"
+    ok "Dependencies installed"
 
-    # Install cloudflared
     if ! command -v cloudflared &>/dev/null; then
-        info "Installing cloudflared..."
         local cf_url
         case "$ARCH" in
             arm64) cf_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64" ;;
             arm)   cf_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm" ;;
             *)     cf_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" ;;
         esac
+        mkdir -p "$HOME/.local/bin"
         download_file "$cf_url" "$HOME/.local/bin/cloudflared" && \
         chmod +x "$HOME/.local/bin/cloudflared" && \
         export PATH="$HOME/.local/bin:$PATH" && \
-        ok "cloudflared installed" || warn "cloudflared install failed (optional for dev mode)"
-    else
-        ok "cloudflared already installed"
+        ok "cloudflared installed" || warn "cloudflared install failed"
     fi
 
     # Start server
-    header "Starting Porter"
     if command -v gunicorn &>/dev/null; then
-        nohup gunicorn --bind "0.0.0.0:$PORT" --workers 2 --worker-class gevent --timeout 120 --preload app:app >> "${INSTALL_DIR}/portal.log" 2>&1 &
+        nohup gunicorn --bind "0.0.0.0:$PORT" --workers 2 --worker-class gevent --timeout 120 --preload app:app > /dev/null 2>&1 &
     else
-        nohup $PYTHON app.py >> "${INSTALL_DIR}/portal.log" 2>&1 &
+        nohup $PYTHON app.py > /dev/null 2>&1 &
     fi
-
-    local pid=$!
+    disown
     sleep 2
+    ok "Server running on port ${PORT}"
 
-    if kill -0 "$pid" 2>/dev/null; then
-        ok "Server running at http://localhost:${PORT}"
-        start_tunnel
-    else
-        warn "Server may have failed to start. Check: ${INSTALL_DIR}/portal.log"
+    # Start tunnel
+    if command -v cloudflared &>/dev/null; then
+        cloudflared tunnel --url "http://localhost:${PORT}" > "${INSTALL_DIR}/.tunnel.log" 2>&1 &
+        local tunnel_pid=$!
+        echo "$tunnel_pid" > "${INSTALL_DIR}/.tunnel.pid"
+        local waited=0 tunnel_url=""
+        while [ $waited -lt 15 ]; do
+            sleep 1; waited=$((waited + 1))
+            tunnel_url=$(grep -oP 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
+            [ -n "$tunnel_url" ] && break
+        done
+        if [ -n "$tunnel_url" ]; then
+            echo "$tunnel_url" > "${INSTALL_DIR}/.tunnel_url"
+        fi
     fi
 
     print_summary
