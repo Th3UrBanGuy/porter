@@ -231,73 +231,28 @@ EOF
 }
 
 # ──────────────────────────────────────────────────────────────
-#  Start localhost.run tunnel
+#  Start cloudflared quick tunnel
 # ──────────────────────────────────────────────────────────────
-ensure_ssh_key() {
-    local key_file="${HOME}/.ssh/id_ed25519"
-    if [ -f "${key_file}" ] || [ -f "${HOME}/.ssh/id_rsa" ]; then
-        return
-    fi
-    info "Generating SSH key for tunnel..."
-    mkdir -p "${HOME}/.ssh"
-    ssh-keygen -t ed25519 -f "${key_file}" -N "" -q 2>/dev/null || \
-    ssh-keygen -t rsa -f "${HOME}/.ssh/id_rsa" -N "" -q 2>/dev/null || {
-        warn "Failed to generate SSH key"
-        return 1
-    }
-    ok "SSH key generated"
-}
-
 start_tunnel() {
-    if ! command -v ssh &>/dev/null; then
-        warn "ssh not found, skipping tunnel"
+    if ! command -v cloudflared &>/dev/null; then
+        warn "cloudflared not found, skipping tunnel"
         return
     fi
 
-    ensure_ssh_key || return
+    info "Opening public tunnel via cloudflared..."
 
-    info "Opening public tunnel via localhost.run..."
-
-    ssh -T -o StrictHostKeyChecking=no -o ServerAliveInterval=60 \
-        -R 80:localhost:${PORT} localhost.run \
+    cloudflared tunnel --url "http://localhost:${PORT}" \
         > "${INSTALL_DIR}/.tunnel.log" 2>&1 &
     local tunnel_pid=$!
     echo "$tunnel_pid" > "${INSTALL_DIR}/.tunnel.pid"
 
     local waited=0
     local tunnel_url=""
-    while [ $waited -lt 20 ]; do
+    while [ $waited -lt 15 ]; do
         sleep 1
         waited=$((waited + 1))
-        tunnel_url=$(grep -oP 'https://[a-zA-Z0-9.-]+\.lhr\.life' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
-        if [ -z "$tunnel_url" ]; then
-            tunnel_url=$(grep -oP 'https://[a-zA-Z0-9.-]+\.localhost\.run' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
-        fi
+        tunnel_url=$(grep -oP 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
         [ -n "$tunnel_url" ] && break
-
-        # First-time auth required
-        if grep -q "authorize" "${INSTALL_DIR}/.tunnel.log" 2>/dev/null; then
-            local auth_url
-            auth_url=$(grep -oP 'https://[^\s]+authorize[^\s]*' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
-            if [ -n "${auth_url:-}" ]; then
-                echo
-                info "Open this URL in your browser to authorize the tunnel:"
-                printf "${BOLD}${auth_url}${RESET}\n"
-                echo
-                info "Waiting for authorization..."
-                waited=0
-                while [ $waited -lt 60 ]; do
-                    sleep 2
-                    waited=$((waited + 1))
-                    tunnel_url=$(grep -oP 'https://[a-zA-Z0-9.-]+\.lhr\.life' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
-                    if [ -z "$tunnel_url" ]; then
-                        tunnel_url=$(grep -oP 'https://[a-zA-Z0-9.-]+\.localhost\.run' "${INSTALL_DIR}/.tunnel.log" 2>/dev/null | head -1)
-                    fi
-                    [ -n "$tunnel_url" ] && break
-                done
-                break
-            fi
-        fi
     done
 
     if [ -n "$tunnel_url" ]; then
