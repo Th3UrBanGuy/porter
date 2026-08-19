@@ -123,8 +123,18 @@ get_gunicorn_cmd() {
     fi
 }
 
+# ── Detect systemd ──────────────────────────────────────────
+has_systemd() {
+    command -v systemctl &>/dev/null && [ "$(ps -p 1 -o comm= 2>/dev/null)" = "systemd" ]
+}
+
 # ── Create systemd service ──────────────────────────────────
 create_service() {
+    if ! has_systemd; then
+        warn "systemd not available (container / non-systemd init), skipping service"
+        return 1
+    fi
+
     info "Creating systemd service..."
 
     local python_cmd
@@ -185,20 +195,56 @@ start_service() {
         sleep 1
     fi
 
-    sudo systemctl start ${SERVICE_NAME}
+    local python_cmd
+    python_cmd="$(get_python_cmd)"
+    local gunicorn_cmd
+    gunicorn_cmd="$(get_gunicorn_cmd)"
 
-    # Wait for port
-    local waited=0
-    while [ $waited -lt 20 ]; do
-        sleep 1
-        waited=$((waited + 1))
-        if curl -sf "http://localhost:${PORT}/api/status" > /dev/null 2>&1; then
-            ok "Porter is running at http://localhost:${PORT}"
-            return
-        fi
-    done
+    if has_systemd; then
+        sudo systemctl start ${SERVICE_NAME}
 
-    warn "Service started but port not responding yet. Check: journalctl -u porter -f"
+        # Wait for port
+        local waited=0
+        while [ $waited -lt 20 ]; do
+            sleep 1
+            waited=$((waited + 1))
+            if curl -sf "http://localhost:${PORT}/api/status" > /dev/null 2>&1; then
+                ok "Porter is running at http://localhost:${PORT}"
+                return
+            fi
+        done
+        warn "Service started but port not responding yet. Check: journalctl -u porter -f"
+    else
+        # No systemd — run directly with nohup
+        cd "${INSTALL_DIR}"
+        nohup ${gunicorn_cmd} \
+            --bind "0.0.0.0:${PORT}" \
+            --workers 2 \
+            --worker-class gevent \
+            --worker-connections 1000 \
+            --timeout 120 \
+            --keep-alive 5 \
+            --log-level info \
+            --access-logfile - \
+            --error-logfile - \
+            --preload \
+            app:app >> "${INSTALL_DIR}/portal.log" 2>&1 &
+
+        local server_pid=$!
+        info "Server PID: ${server_pid}"
+
+        # Wait for port
+        local waited=0
+        while [ $waited -lt 20 ]; do
+            sleep 1
+            waited=$((waited + 1))
+            if curl -sf "http://localhost:${PORT}/api/status" > /dev/null 2>&1; then
+                ok "Porter is running at http://localhost:${PORT}"
+                return
+            fi
+        done
+        warn "Server may still be starting... check http://localhost:${PORT}"
+    fi
 }
 
 # ── Main ─────────────────────────────────────────────────────
@@ -223,10 +269,15 @@ main() {
     info "Setup:    http://localhost:${PORT}/setup"
     info "Port:     ${PORT}"
     echo
-    info "Service:  sudo systemctl status ${SERVICE_NAME}"
-    info "Logs:     sudo journalctl -u ${SERVICE_NAME} -f"
-    info "Restart:  sudo systemctl restart ${SERVICE_NAME}"
-    info "Stop:     sudo systemctl stop ${SERVICE_NAME}"
+    if has_systemd; then
+        info "Service:  sudo systemctl status ${SERVICE_NAME}"
+        info "Logs:     sudo journalctl -u ${SERVICE_NAME} -f"
+        info "Restart:  sudo systemctl restart ${SERVICE_NAME}"
+        info "Stop:     sudo systemctl stop ${SERVICE_NAME}"
+    else
+        info "Logs:     tail -f ${INSTALL_DIR}/portal.log"
+        info "Stop:     kill \$(lsof -ti:${PORT})"
+    fi
     echo
 }
 
