@@ -162,15 +162,34 @@ class CloudflareCLI:
         self._client_info = None
 
     def _load_tokens(self):
-        if os.path.exists(self.tokens_file):
-            with open(self.tokens_file) as f:
-                return json.load(f)
-        return {}
+        if not os.path.exists(self.tokens_file):
+            return {}
+        with open(self.tokens_file) as f:
+            data = json.load(f)
+        # Server format: {"client_info": {...}, "tokens": {...}} — flatten for CLI use
+        if isinstance(data.get("tokens"), dict):
+            flat = dict(data["tokens"])
+            client_info = data.get("client_info")
+            if isinstance(client_info, dict):
+                cid = client_info.get("client_id")
+                if cid and not flat.get("client_id"):
+                    flat["client_id"] = cid
+                if not flat.get("client_info"):
+                    flat["client_info"] = client_info
+            return flat
+        return data
 
     def _save_tokens(self, data):
+        """Write tokens in the nested server-compatible format."""
         os.makedirs(os.path.dirname(self.tokens_file), exist_ok=True)
+        client_info = self._client_info or data.get("client_info")
+        tokens = {k: v for k, v in data.items() if k not in ("tokens", "client_info")}
+        payload = {}
+        if client_info:
+            payload["client_info"] = client_info
+        payload["tokens"] = tokens
         with open(self.tokens_file, "w") as f:
-            json.dump(data, f, indent=2)
+            json.dump(payload, f, indent=2)
 
     def _discover_metadata(self):
         if self._metadata:

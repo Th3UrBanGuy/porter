@@ -1,7 +1,13 @@
 # Secrets & tokens
 config.json
 tokens.json
+tokens.json.bak
 tunnels.json
+*.bak
+
+# Runtime state
+.bootstrap.lock
+server.pid
 
 # Logs
 *.log
@@ -10,6 +16,7 @@ tunnels.json
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
 
 # IDE
 .vscode/

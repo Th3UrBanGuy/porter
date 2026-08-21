@@ -97,6 +97,12 @@ def _find_existing_cloudflared():
                     token_match = re.search(r"--token\s+(\S+)", cmd_full)
                     token = token_match.group(1) if token_match else None
 
+                    # Ignore processes without a token (e.g. quick tunnels
+                    # started with `--url`) — they are not managed by us
+                    # and must never be adopted or counted as "running".
+                    if not token:
+                        continue
+
                     # Detect protocol from args
                     proto_match = re.search(r"--protocol\s+(\S+)", cmd_full)
                     protocol = proto_match.group(1) if proto_match else "quic"
@@ -517,56 +523,11 @@ class TunnelManager:
         existing = _find_existing_cloudflared()
         for proc_info in existing:
             proc_token = proc_info.get("token", "")
-            proc_tunnel_id = proc_info.get("token", "")
             # Kill if it has a different token than ours
             if proc_token and proc_token != our_token:
                 try:
                     os.killpg(os.getpgid(proc_info["pid"]), signal.SIGTERM)
                     log.info("Killed stale cloudflared with different token (pid=%s)", proc_info["pid"])
-                except (ProcessLookupError, PermissionError):
-                    pass
-
-        time.sleep(0.5)
-        """Kill all cloudflared processes started by this portal."""
-        # Kill our internal process
-        if self._process:
-            try:
-                os.killpg(os.getpgid(self._process.pid), signal.SIGTERM)
-                log.info("Stopped internal cloudflared (pid=%s)", self._process.pid)
-            except (ProcessLookupError, PermissionError):
-                pass
-            self._process = None
-
-        # Kill adopted process
-        if self._adopted_pid:
-            try:
-                os.killpg(os.getpgid(self._adopted_pid), signal.SIGTERM)
-                log.info("Stopped adopted cloudflared (pid=%s)", self._adopted_pid)
-            except (ProcessLookupError, PermissionError):
-                pass
-            self._adopted_pid = None
-
-        # Kill process from config
-        cfg = _load_config()
-        config_pid = cfg.get("cloudflared_pid")
-        if config_pid:
-            try:
-                os.killpg(os.getpgid(config_pid), signal.SIGTERM)
-                log.info("Stopped config cloudflared (pid=%s)", config_pid)
-            except (ProcessLookupError, PermissionError):
-                pass
-
-        # Wait for processes to die
-        time.sleep(1)
-
-        # Also find and kill any remaining cloudflared with our tunnel token
-        tunnel_id = cfg.get("tunnel_id", "")
-        existing = _find_existing_cloudflared()
-        for proc_info in existing:
-            if tunnel_id and tunnel_id in (proc_info.get("token") or ""):
-                try:
-                    os.killpg(os.getpgid(proc_info["pid"]), signal.SIGTERM)
-                    log.info("Stopped matching cloudflared (pid=%s)", proc_info["pid"])
                 except (ProcessLookupError, PermissionError):
                     pass
 

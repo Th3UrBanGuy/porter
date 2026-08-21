@@ -8,6 +8,7 @@ Uses OAuth 2.1 with PKCE for Cloudflare authentication.
 Stable version: uses a single cloudflared process managed by TunnelManager.
 """
 
+import fcntl
 import hashlib
 import json
 import logging
@@ -57,6 +58,30 @@ logging.basicConfig(
 log = logging.getLogger("portal")
 
 
+# --- Force HTTPS for traffic arriving through Cloudflare ---
+# Cloudflare sets X-Forwarded-Proto on every proxied request. Direct LAN /
+# localhost access (OAuth callback, local dashboard) has no such header and
+# is left untouched, so http://localhost:7262 keeps working.
+@app.before_request
+def _force_https():
+    if request.headers.get("X-Forwarded-Proto") == "http":
+        url = request.url.replace("http://", "https://", 1)
+        return redirect(url, code=308)
+    return None
+
+
+@app.after_request
+def _add_hsts(response):
+    if (
+        request.headers.get("X-Forwarded-Proto") == "https"
+        or request.is_secure
+    ):
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+        )
+    return response
+
+
 # --- Startup reconciliation ---
 def _startup_reconcile():
     """Validate tunnels and auto-restart cloudflared on app start."""
@@ -95,6 +120,42 @@ def _background_health_check():
                 manager.auto_restart_if_needed(tunnel_token)
         except Exception as e:
             log.error("Health check error: %s", e)
+
+
+# --- Bootstrap (runs at import time so gunicorn workers get it too) ---
+# Under `gunicorn app:app --preload`, code inside `if __name__ == "__main__"`
+# never executes — which previously meant tunnels.json was never reconciled
+# and cloudflared never restarted after a device reboot. A file lock ensures
+# exactly one process performs initialization even with multiple workers.
+_BOOTSTRAP_LOCK_FILE = os.path.join(BASE_DIR, ".bootstrap.lock")
+_bootstrapped = False
+_bootstrap_lock_fd = None
+
+
+def _bootstrap():
+    """Initialize manager, reconcile saved tunnels, start health monitor."""
+    global _bootstrapped, _bootstrap_lock_fd
+    if _bootstrapped:
+        return
+    _bootstrapped = True
+
+    try:
+        _bootstrap_lock_fd = open(_BOOTSTRAP_LOCK_FILE, "w")
+        try:
+            fcntl.flock(_bootstrap_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            log.info("Bootstrap: another Porter process owns startup; skipping")
+            return
+    except OSError:
+        pass  # read-only filesystem — proceed unlocked (single instance)
+
+    try:
+        manager = get_manager()
+        manager.init()
+        _startup_reconcile()
+        Thread(target=_background_health_check, daemon=True).start()
+    except Exception as e:
+        log.error("Bootstrap failed: %s", e)
 
 
 # --- Auth decorator ---
@@ -424,19 +485,20 @@ def api_create_tunnel():
         except Exception as e:
             return jsonify({"error": f"Failed to get tunnel token: {str(e)}"}), 500
 
-    # Save tunnel token for manager
-    if tunnel_token and not cfg.get("tunnel_token"):
-        cfg["tunnel_token"] = tunnel_token
-        _save_config(cfg)
+    # Save tunnel token for manager (reload to avoid clobbering keys
+    # written meanwhile, e.g. tunnel_id saved by create_tunnel)
+    if tunnel_token:
+        fresh_cfg = _load_config()
+        if not fresh_cfg.get("tunnel_token"):
+            fresh_cfg["tunnel_token"] = tunnel_token
+            _save_config(fresh_cfg)
 
     # Start/restart cloudflared with this tunnel token (single process)
     manager = get_manager()
     try:
-        if not manager.is_running():
-            manager.start(tunnel_token)
-        else:
-            # Process is running, just ensure token is saved
-            log.info("cloudflared already running, adding ingress rule via API")
+        # start() is idempotent: adopts a running process with the same
+        # token, kills stale/different-token processes before starting.
+        manager.start(tunnel_token)
     except Exception as e:
         return jsonify({"error": f"Failed to start cloudflared: {str(e)}"}), 500
 
@@ -571,18 +633,19 @@ def api_create_tunnel_stream():
                         q.put(None)
                         return
 
-                # Save tunnel token for manager
+                # Save tunnel token for manager (reload to avoid clobbering
+                # keys written meanwhile, e.g. tunnel_id)
                 if tunnel_token:
-                    cfg["tunnel_token"] = tunnel_token
-                    _save_config(cfg)
+                    fresh_cfg = _load_config()
+                    if not fresh_cfg.get("tunnel_token"):
+                        fresh_cfg["tunnel_token"] = tunnel_token
+                        _save_config(fresh_cfg)
 
                 send("start", "running", "Starting cloudflared...")
                 try:
-                    if not manager.is_running():
-                        manager.start(tunnel_token)
-                        send("start", "ok", f"cloudflared started (protocol={manager.get_protocol()})")
-                    else:
-                        send("start", "ok", "cloudflared already running, ingress rule added")
+                    # start() is idempotent: adopts matching token, kills stale
+                    manager.start(tunnel_token)
+                    send("start", "ok", f"cloudflared started (protocol={manager.get_protocol()})")
                 except FileNotFoundError:
                     send("start", "error", "cloudflared not found. Please install it first.")
                     q.put(None)
@@ -730,7 +793,7 @@ def api_restart_tunnel():
         return jsonify({"error": "No tunnel token available"}), 400
 
     try:
-        protocol = request.get_json().get("protocol") if request.is_json else None
+        protocol = (request.get_json(silent=True) or {}).get("protocol")
         manager.restart(tunnel_token, protocol)
         return jsonify({"success": True, "message": "cloudflared restarted", "protocol": manager.get_protocol()})
     except Exception as e:
@@ -850,17 +913,17 @@ def api_keys_rotate(key_id):
     return jsonify({"error": "key not found"}), 404
 
 
+# Bootstrap on import — this is what makes tunnel restore work under
+# gunicorn/systemd, where `if __name__ == "__main__"` never runs.
+_bootstrap()
+
+
 if __name__ == "__main__":
     log.info("Starting Cloudflare Tunnel Portal on port %s", PORT)
 
-    # Initialize TunnelManager (detects existing cloudflared processes)
-    manager = get_manager()
-    manager.init()
-
-    _startup_reconcile()
-
-    # Start background health monitor
-    health_thread = Thread(target=_background_health_check, daemon=True)
-    health_thread.start()
+    # Initialize TunnelManager, restore saved tunnels and start the
+    # health monitor. Runs at import time so it works under gunicorn
+    # (--preload) as well as `python app.py` dev mode.
+    _bootstrap()
 
     app.run(host="0.0.0.0", port=PORT, debug=False)
