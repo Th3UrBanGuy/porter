@@ -299,6 +299,105 @@ def docs():
     return render_template("docs.html")
 
 
+def _apply_broker_payload(payload):
+    """
+    Write a broker token payload ({client_info, tokens}) into tokens.json,
+    keeping any locally-registered OAuth client intact. Returns the account
+    label from the payload when available.
+    """
+    tokens = payload.get("tokens") or {}
+    client_info = payload.get("client_info")
+    if isinstance(client_info, dict) and client_info.get("client_id"):
+        tokens.setdefault("client_id", client_info["client_id"])
+
+    storage = TokenStorage()
+    existing_client = storage.get_client_info()
+    storage.set_tokens(tokens)
+    if (
+        isinstance(client_info, dict)
+        and client_info.get("client_id")
+        and not (isinstance(existing_client, dict) and existing_client.get("client_id"))
+    ):
+        storage.set_client_info(client_info)
+    return True
+
+
+def _handle_connect_portal(cfg, is_connected, setup_done):
+    """Setup action: pull Cloudflare credentials from the Porter Broker."""
+    from portal_client import (
+        PortalError,
+        exchange_credentials,
+        list_connections,
+        pull_token,
+        save_portal_settings,
+    )
+
+    def _render(error=None, success=None, portal_connections=None):
+        return render_template(
+            "setup.html",
+            error=error,
+            success=success,
+            cfg=_load_config(),
+            is_connected=is_connected,
+            setup_done=setup_done,
+            portal_connections=portal_connections or [],
+        )
+
+    portal_url = request.form.get("portal_url", "").strip()
+    identifier = request.form.get("portal_identifier", "").strip()
+    password = request.form.get("portal_password", "")
+    connection_id = request.form.get("connection_id", "").strip()
+
+    try:
+        api_key = cfg.get("portal_api_key")
+
+        # First step: exchange credentials for a device API key.
+        if password:
+            if not identifier:
+                return _render(error="Email/username is required")
+            if not portal_url:
+                return _render(error="Portal URL is required")
+            api_key = exchange_credentials(portal_url, identifier, password)
+        elif not api_key:
+            return _render(error="Enter your portal email/username and password")
+
+        # Persist url+key immediately so the account-picker step works.
+        fresh = _load_config()
+        save_portal_settings(
+            fresh, portal_url or fresh.get("portal_url", ""), api_key,
+            fresh.get("portal_connection_id", ""),
+        )
+        _save_config(fresh)
+        base = fresh["portal_url"]
+
+        conns = list_connections(base, api_key)
+        if not conns:
+            return _render(
+                error="No Cloudflare connections on the broker — connect one "
+                      "on the broker dashboard first, then try again."
+            )
+
+        # Multiple accounts and none picked yet -> show picker.
+        if len(conns) > 1 and not connection_id:
+            return _render(portal_connections=conns)
+
+        chosen = next((c for c in conns if c["id"] == connection_id), conns[0])
+        payload = pull_token(base, api_key, chosen["id"])
+        _apply_broker_payload(payload)
+
+        fresh = _load_config()
+        save_portal_settings(fresh, base, api_key, chosen["id"])
+        _save_config(fresh)
+
+        log.info("Connected via Porter Broker (connection=%s)", chosen["id"])
+        return _render(success=f"Connected via Porter Broker — {chosen['label']}")
+    except PortalError as e:
+        return _render(error=str(e))
+    except Exception as e:
+        log.error("Portal connect failed: %s", e)
+        return _render(error=f"Portal connect failed: {e}")
+
+
 @app.route("/setup", methods=["GET", "POST"])
 def setup():
     cfg = _load_config()
@@ -316,6 +415,9 @@ def setup():
             except Exception as e:
                 log.error("OAuth initiation failed: %s", e)
                 return render_template("setup.html", error=str(e), cfg=cfg, is_connected=is_connected, setup_done=setup_done)
+
+        elif action == "connect_portal":
+            return _handle_connect_portal(cfg, is_connected, setup_done)
 
         elif action == "set_passcode":
             passcode = request.form.get("passcode", "").strip()

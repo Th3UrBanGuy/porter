@@ -136,9 +136,46 @@
             <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Disconnect from Cloudflare?')">Disconnect</button>
           </form>
         </div>
+        {% if cfg.get('portal_url') %}
+        <p style="margin:10px 0 0;font-size:11px;color:var(--text3)">via Porter Broker: {{ cfg.get('portal_url') }}</p>
+        {% endif %}
       {% else %}
         <div style="margin-left:40px">
           <a href="/auth/cloudflare" class="btn btn-primary" style="text-decoration:none;display:inline-block">Connect Cloudflare</a>
+        </div>
+
+        <div style="margin:18px 40px 0;padding-top:16px;border-top:1px dashed var(--border)">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">No browser here? Connect via Porter Broker</div>
+
+          {% if portal_connections %}
+            <form method="POST">
+              <input type="hidden" name="action" value="connect_portal">
+              <input type="hidden" name="portal_url" value="{{ cfg.get('portal_url','') }}">
+              <div class="field" style="margin-bottom:10px">
+                <select name="connection_id" required style="width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;font-weight:500;outline:none;font-family:var(--font)">
+                  {% for c in portal_connections %}
+                  <option value="{{ c.id }}">{{ c.label }}{% if c.cf_account_name %} &mdash; {{ c.cf_account_name }}{% endif %}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <button type="submit" class="btn btn-outline btn-sm">Use this account</button>
+            </form>
+          {% else %}
+            <form method="POST">
+              <input type="hidden" name="action" value="connect_portal">
+              <div class="field" style="margin-bottom:10px">
+                <input type="text" name="portal_url" placeholder="Broker URL (e.g. porter-broker.vercel.app)" value="{{ cfg.get('portal_url','') }}">
+              </div>
+              <div class="field" style="margin-bottom:10px">
+                <input type="text" name="portal_identifier" placeholder="Broker email or username" autocomplete="off">
+              </div>
+              <div class="field" style="margin-bottom:12px">
+                <input type="password" name="portal_password" placeholder="Broker password" autocomplete="off">
+              </div>
+              <button type="submit" class="btn btn-outline btn-sm">Connect via Broker</button>
+            </form>
+          {% endif %}
+          <p style="margin:8px 0 0;font-size:11px;color:var(--text3)">Your password is exchanged once for a device API key and never stored.</p>
         </div>
       {% endif %}
     </div>

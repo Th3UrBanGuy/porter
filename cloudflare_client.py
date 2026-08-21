@@ -181,17 +181,82 @@ class CloudflareOAuth:
             return token_data
         raise Exception(f"Token exchange failed: {resp.status_code} {resp.text}")
 
+    def _repull_from_broker(self):
+        """
+        Last-resort credential recovery: pull a fresh token payload from the
+        Porter Broker portal (if configured). This keeps multi-device setups
+        working when a local refresh token has been rotated elsewhere.
+        """
+        cfg = _load_config()
+        base = cfg.get("portal_url")
+        api_key = cfg.get("portal_api_key")
+        connection_id = cfg.get("portal_connection_id")
+        if not (base and api_key and connection_id):
+            return False
+
+        from portal_client import PortalError, pull_token
+        try:
+            payload = pull_token(base, api_key, connection_id)
+        except PortalError as e:
+            log.warning("Broker re-pull failed: %s", e)
+            return False
+
+        tokens = payload.get("tokens") or {}
+        client_info = payload.get("client_info")
+        # The refresh token is bound to whichever OAuth client issued it —
+        # remember the broker's client so we can refresh with the right id.
+        if isinstance(client_info, dict) and client_info.get("client_id"):
+            tokens.setdefault("client_id", client_info["client_id"])
+            existing = self.storage.get_client_info()
+            if not (isinstance(existing, dict) and existing.get("client_id")):
+                self.storage.set_client_info(client_info)
+        self.storage.set_tokens(tokens)
+        log.info("Re-pulled Cloudflare credentials from Porter Broker")
+        return True
+
     def refresh_token(self):
         tokens = self.storage.get_tokens()
-        if not tokens or not tokens.get("refresh_token"):
-            raise Exception("No refresh token")
+        first_error = None
+
+        if tokens and tokens.get("refresh_token"):
+            try:
+                return self._do_refresh(tokens)
+            except Exception as e:
+                first_error = e
+
+        # Fall back to the broker before giving up.
+        if self._repull_from_broker():
+            tokens = self.storage.get_tokens()
+            if tokens and tokens.get("refresh_token"):
+                try:
+                    return self._do_refresh(tokens)
+                except Exception:
+                    pass
+                # Even if the refresh call failed, the pulled access token
+                # might still be within its validity window.
+                if tokens.get("expires_at", 0) > time.time() + 60:
+                    return tokens["access_token"]
+
+        if first_error:
+            raise first_error
+        raise Exception("No refresh token")
+
+    def _do_refresh(self, tokens):
         metadata = self._discover_metadata()
-        client_info = self.storage.get_client_info()
+        client_info = self.storage.get_client_info() or {}
+        # Prefer the client that originally issued the token (the broker's
+        # when credentials were pulled from the portal).
+        client_id = (
+            tokens.get("client_id")
+            or client_info.get("client_id")
+        )
+        if not client_id:
+            raise Exception("No OAuth client_id available for refresh")
         token_endpoint = metadata.get("token_endpoint", f"{CF_MCP_BASE}/token")
         payload = {
             "grant_type": "refresh_token",
             "refresh_token": tokens["refresh_token"],
-            "client_id": client_info["client_id"],
+            "client_id": client_id,
         }
         resp = httpx.post(token_endpoint, data=payload, timeout=10)
         if resp.status_code == 200:

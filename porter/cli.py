@@ -245,8 +245,188 @@ def cmd_cf(args):
         ok = cf.refresh()
         sys.exit(0 if ok else 1)
 
+    elif action == "portal-login":
+        _cf_portal_login(args)
+
+    elif action == "connections":
+        _cf_portal_connections()
+
+    elif action == "use":
+        _cf_portal_use(getattr(args, "cf_value", None))
+
+    elif action == "sync":
+        _cf_portal_sync()
+
     else:
         _cf_help()
+
+
+def _paths():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return (
+        os.path.join(root, "config.json"),
+        os.path.join(root, "tokens.json"),
+    )
+
+
+def _read_json(path, default=None):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return default if default is not None else {}
+
+
+def _write_json(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def _require_broker_libs():
+    try:
+        import httpx  # noqa: F401
+        import portal_client
+        return portal_client
+    except ImportError as e:
+        out.error(f"Missing dependency: {e}")
+        out.info("Run: pip install httpx")
+        sys.exit(1)
+
+
+def _write_tokens_payload(payload):
+    """Merge a broker payload ({client_info, tokens}) into tokens.json."""
+    _, tokens_file = _paths()
+    data = _read_json(tokens_file, default={})
+    tokens = payload.get("tokens") or {}
+    client_info = payload.get("client_info")
+    if isinstance(client_info, dict) and client_info.get("client_id"):
+        tokens.setdefault("client_id", client_info["client_id"])
+        if not (isinstance(data.get("client_info"), dict)
+                and data["client_info"].get("client_id")):
+            data["client_info"] = client_info
+    data["tokens"] = tokens
+    _write_json(tokens_file, data)
+
+
+def _apply_chosen_connection(pc, url, api_key, chosen, cfg):
+    payload = pc.pull_token(url, api_key, chosen["id"])
+    _write_tokens_payload(payload)
+    cfg["portal_url"] = pc.normalize_base_url(url)
+    cfg["portal_api_key"] = api_key
+    cfg["portal_connection_id"] = chosen["id"]
+    config_file, _ = _paths()
+    _write_json(config_file, cfg)
+
+
+def _cf_portal_login(args):
+    pc = _require_broker_libs()
+    config_file, _ = _paths()
+    cfg = _read_json(config_file)
+    default_url = cfg.get("portal_url", "")
+
+    out.header("Porter Broker login")
+    url = (getattr(args, "cf_value", None) or "").strip()
+    if not url:
+        url = input(f"Broker URL [{default_url}]: ").strip() or default_url
+    if not url:
+        out.error("Broker URL is required")
+        sys.exit(1)
+    identifier = input("Email or username: ").strip()
+    password = getpass.getpass("Password: ")
+    if not identifier or not password:
+        out.error("Credentials required")
+        sys.exit(1)
+
+    try:
+        api_key = pc.exchange_credentials(url, identifier, password)
+        out.success("Authenticated — device API key issued")
+
+        conns = pc.list_connections(url, api_key)
+        if not conns:
+            out.error("No Cloudflare connections on the broker.")
+            out.info("Connect one on the broker dashboard, then run this again.")
+            sys.exit(1)
+
+        print()
+        for i, c in enumerate(conns, 1):
+            label = c.get("cf_account_name") or c.get("label")
+            out.bullet(f"{i}. {label}  {out.dim(c['id'])}")
+
+        pick = input(f"\nSelect account [1-{len(conns)}] (default 1): ").strip()
+        idx = int(pick) - 1 if pick.isdigit() and 0 <= int(pick) - 1 < len(conns) else 0
+        chosen = conns[idx]
+
+        _apply_chosen_connection(pc, url, api_key, chosen, cfg)
+        out.success(f"Connected via Porter Broker — {chosen.get('cf_account_name') or chosen['label']}")
+        out.info("Restart the portal server (porter server restart) to pick up credentials.")
+    except pc.PortalError as e:
+        out.error(str(e))
+        sys.exit(1)
+
+
+def _cf_portal_connections():
+    pc = _require_broker_libs()
+    config_file, _ = _paths()
+    cfg = _read_json(config_file)
+    url, api_key = cfg.get("portal_url"), cfg.get("portal_api_key")
+    active = cfg.get("portal_connection_id")
+    if not (url and api_key):
+        out.error("Not linked to a broker. Run: porter cf portal-login")
+        sys.exit(1)
+    try:
+        conns = pc.list_connections(url, api_key)
+    except pc.PortalError as e:
+        out.error(str(e))
+        sys.exit(1)
+    print()
+    for c in conns:
+        marker = " *active*" if c["id"] == active else ""
+        out.table_row(c.get("cf_account_name") or c.get("label"), out.dim(c["id"]), marker.strip())
+    if not conns:
+        out.info("No connections found on the broker.")
+
+
+def _cf_portal_use(connection_id):
+    pc = _require_broker_libs()
+    if not connection_id:
+        out.error("Usage: porter cf use <connection-id>")
+        sys.exit(1)
+    config_file, _ = _paths()
+    cfg = _read_json(config_file)
+    url, api_key = cfg.get("portal_url"), cfg.get("portal_api_key")
+    if not (url and api_key):
+        out.error("Not linked to a broker. Run: porter cf portal-login")
+        sys.exit(1)
+    try:
+        conns = pc.list_connections(url, api_key)
+        chosen = next((c for c in conns if c["id"] == connection_id), None)
+        if not chosen:
+            out.error(f"Connection {connection_id} not found on broker")
+            sys.exit(1)
+        _apply_chosen_connection(pc, url, api_key, chosen, cfg)
+        out.success(f"Switched to {chosen.get('cf_account_name') or chosen['label']}")
+    except pc.PortalError as e:
+        out.error(str(e))
+        sys.exit(1)
+
+
+def _cf_portal_sync():
+    pc = _require_broker_libs()
+    config_file, _ = _paths()
+    cfg = _read_json(config_file)
+    url, api_key = cfg.get("portal_url"), cfg.get("portal_api_key")
+    conn_id = cfg.get("portal_connection_id")
+    if not (url and api_key and conn_id):
+        out.error("Not linked to a broker. Run: porter cf portal-login")
+        sys.exit(1)
+    try:
+        payload = pc.pull_token(url, api_key, conn_id)
+        _write_tokens_payload(payload)
+        _write_json(config_file, cfg)
+        out.success("Re-pulled Cloudflare credentials from the broker")
+    except pc.PortalError as e:
+        out.error(str(e))
+        sys.exit(1)
 
 
 def _cf_help():
@@ -259,6 +439,10 @@ def _cf_help():
     out.bullet("porter cf status                 Check connection status")
     out.bullet("porter cf disconnect             Disconnect from Cloudflare")
     out.bullet("porter cf refresh                Refresh OAuth token")
+    out.bullet("porter cf portal-login [url]     Pull credentials from Porter Broker (headless)")
+    out.bullet("porter cf connections            List broker Cloudflare connections")
+    out.bullet("porter cf use <connection-id>    Switch active broker connection")
+    out.bullet("porter cf sync                   Force re-pull active broker connection")
     print()
     sys.exit(1)
 
@@ -1166,10 +1350,12 @@ def main():
     # -- cf (cloudflare) --
     p_cf = sub.add_parser("cf", add_help=False)
     p_cf.add_argument("cf_action", nargs="?", help=argparse.SUPPRESS)
+    p_cf.add_argument("cf_value", nargs="?", help=argparse.SUPPRESS)
 
     # -- cloudflare alias --
     p_cloudflare = sub.add_parser("cloudflare", add_help=False)
     p_cloudflare.add_argument("cf_action", nargs="?", help=argparse.SUPPRESS)
+    p_cloudflare.add_argument("cf_value", nargs="?", help=argparse.SUPPRESS)
 
     # -- tunnels --
     p_tunnels = sub.add_parser("tunnels", add_help=False)
