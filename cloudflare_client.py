@@ -434,7 +434,7 @@ async () => {{
             _save_config(cfg)
             self.config = cfg
 
-        secret = _b64url(secrets.token_bytes(32))
+        secret = base64.b64encode(secrets.token_bytes(32)).decode()
         code = f"""
 async () => {{
     const response = await cloudflare.request({{
@@ -442,7 +442,8 @@ async () => {{
         path: `/accounts/{account_id}/cfd_tunnel`,
         body: {{
             name: "{name}",
-            tunnel_secret: "{secret}"
+            tunnel_secret: "{secret}",
+            config_src: "cloudflare"
         }}
     }});
     return response.result;
@@ -485,8 +486,8 @@ async () => {{
         existing = self._execute_code(get_code)
         existing_ingress = []
         if isinstance(existing, dict):
-            config = existing.get("config", {})
-            existing_ingress = config.get("ingress", [])
+            config = existing.get("config") or {}
+            existing_ingress = config.get("ingress") or []
 
         hostname_rules = [r for r in existing_ingress if r.get("hostname")]
         catch_all = [r for r in existing_ingress if r.get("service") == "http_status:404"]

@@ -581,7 +581,8 @@ def _port_pid(port):
                 )
                 parts = result.stdout.strip().split(",")
                 if parts:
-                    out.info(f"Process: {parts[0].strip('\"')}")
+                    proc_name = parts[0].strip('"')
+                    out.info(f"Process: {proc_name}")
             except Exception:
                 pass
         else:
