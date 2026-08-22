@@ -13,74 +13,82 @@
 :root{
   --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
-  --accent:#f6821f;--accent2:#e65c00;
-  --green:#22c55e;--red:#ef4444;--indigo:#6366f1;
-  --tr:all .25s ease;
+  --accent:#f6821f;--accent2:#e65c00;--accent3:#fb923c;
+  --green:#22c55e;--red:#ef4444;--indigo:#6366f1;--cyan:#06b6d4;
+  --transition:all .25s ease;
 }
-[data-theme="dark"]{--bg:#06060e;--surface:rgba(14,14,24,.65);--surface2:rgba(255,255,255,.03);--border:rgba(255,255,255,.07);--text:#e8e8ec;--text2:#9a9aa5;--text3:#5b5b66}
-[data-theme="light"]{--bg:#f7f7fb;--surface:rgba(255,255,255,.85);--surface2:rgba(15,15,30,.03);--border:rgba(10,10,30,.08);--text:#16162a;--text2:#55556a;--text3:#9090a4}
+[data-theme="dark"]{--bg:#06060e;--surface:rgba(14,14,24,.65);--surface2:rgba(255,255,255,.03);--border:rgba(255,255,255,.05);--text:#e8e8ec;--text2:#888;--text3:#555;--text4:#333}
+[data-theme="light"]{--bg:#f8f8fb;--surface:rgba(255,255,255,.9);--surface2:rgba(0,0,0,.02);--border:rgba(0,0,0,.06);--text:#1a1a2e;--text2:#555;--text3:#999;--text4:#ccc}
 html{scroll-behavior:smooth}
-body{font-family:var(--font);background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font);background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
 
 .bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-.orb{position:absolute;border-radius:50%;filter:blur(150px);opacity:.07}
-.orb-1{width:800px;height:800px;background:var(--accent);top:-320px;left:-220px;animation:drift 42s ease-in-out infinite}
-.orb-2{width:640px;height:640px;background:var(--indigo);bottom:-280px;right:-180px;animation:drift 36s ease-in-out infinite reverse}
-@keyframes drift{0%,100%{transform:translate(0,0)}33%{transform:translate(40px,-50px)}66%{transform:translate(-30px,35px)}}
-.grid{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:64px 64px;opacity:.35}
+.bg-orb{position:absolute;border-radius:50%;filter:blur(140px);opacity:.05}
+.bg-orb-1{width:800px;height:800px;background:var(--accent);top:-300px;left:-200px;animation:orbFloat 40s ease-in-out infinite}
+.bg-orb-2{width:600px;height:600px;background:var(--indigo);bottom:-300px;right:-200px;animation:orbFloat 35s ease-in-out infinite reverse}
+@keyframes orbFloat{0%,100%{transform:translate(0,0)}33%{transform:translate(30px,-40px)}66%{transform:translate(-20px,30px)}}
+.grid-overlay{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:60px 60px;opacity:.3}
 
-.wrap{position:relative;z-index:1;max-width:1120px;margin:0 auto;padding:0 22px}
-
-/* nav */
-nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(20px);background:color-mix(in srgb,var(--bg) 72%,transparent);border-bottom:1px solid var(--border)}
-.nav-in{max-width:1120px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;gap:26px}
-.logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:16px;letter-spacing:-.3px;text-decoration:none;color:var(--text)}
-.logo-badge{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-size:15px}
-.nav-links{margin-left:auto;display:flex;align-items:center;gap:20px}
-.nav-links a{color:var(--text3);text-decoration:none;font-size:13.5px;font-weight:500;transition:var(--tr)}
-.nav-links a:hover{color:var(--text)}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:12px;font-weight:700;font-size:13.5px;text-decoration:none;cursor:pointer;border:0;transition:var(--tr)}
+/* Nav */
+.nav{position:sticky;top:0;z-index:100;padding:14px 22px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:color-mix(in srgb,var(--bg) 70%,transparent);border-bottom:1px solid var(--border)}
+.nav-left{display:flex;align-items:center;gap:10px}
+.nav-logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-size:15px;color:#000;font-weight:900}
+.nav-brand{font-size:14px;font-weight:800;letter-spacing:-.3px}
+.nav-brand span{color:var(--text3);font-weight:600}
+.nav-right{display:flex;align-items:center;gap:10px}
+.nav-links{display:none;align-items:center;gap:20px}
+@media(min-width:640px){.nav-links{display:flex}}
+.nav-link{color:var(--text3);text-decoration:none;font-size:13.5px;font-weight:500;transition:color .2s}
+.nav-link:hover{color:var(--text)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:12px;font-weight:700;font-size:13.5px;text-decoration:none;cursor:pointer;border:0;transition:var(--transition);font-family:var(--font)}
 .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0a0a12}
 .btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(246,130,31,.35)}
 .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.theme-toggle{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:var(--transition);flex-shrink:0}
+.theme-toggle:active{transform:scale(.95)}
 
-/* hero */
-.hero{padding:96px 0 60px;text-align:center}
+/* Hero */
+.hero{padding:96px 22px 60px;text-align:center;max-width:720px;margin:0 auto}
 .pill{display:inline-flex;align-items:center;gap:8px;padding:7px 15px;border:1px solid var(--border);border-radius:99px;background:var(--surface);font-size:12.5px;color:var(--text2);font-weight:600}
 .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
 .hero h1{font-size:clamp(38px,6.4vw,72px);line-height:1.04;font-weight:900;letter-spacing:-2.4px;margin:26px 0 18px}
 .hero h1 .grad{background:linear-gradient(120deg,var(--accent) 10%,#ffb45e 55%,var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.hero p.sub{max-width:640px;margin:0 auto;font-size:17.5px;line-height:1.65;color:var(--text2)}
+.hero p.sub{max-width:580px;margin:0 auto;font-size:17.5px;line-height:1.65;color:var(--text2)}
+.hero-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px}
+.btn-lg{padding:14px 28px;font-size:14px;border-radius:12px}
+.btn-secondary{background:var(--surface);border:1px solid var(--border);color:var(--text);backdrop-filter:blur(10px)}
 
-/* install box */
-.install{max-width:720px;margin:38px auto 0;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px 20px;backdrop-filter:blur(12px);text-align:left}
+/* Install box */
+.install{max-width:680px;margin:38px auto 0;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px 20px;backdrop-filter:blur(12px);text-align:left}
 .install .label{display:flex;justify-content:space-between;align-items:center;font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text3);font-weight:700;margin-bottom:10px}
-.cmd{display:flex;align-items:center;gap:12px;background:rgba(0,0,0,.45);[data-theme=light]& :background:rgba(0,0,0,.05);border:1px solid var(--border);border-radius:12px;padding:13px 16px;font-family:var(--mono);font-size:13px;overflow-x:auto;white-space:nowrap}
+.cmd{display:flex;align-items:center;gap:12px;background:rgba(0,0,0,.45);border:1px solid var(--border);border-radius:12px;padding:13px 16px;font-family:var(--mono);font-size:13px;overflow-x:auto;white-space:nowrap}
+[data-theme="light"] .cmd{background:rgba(0,0,0,.04)}
 .cmd .p{color:var(--green);user-select:none}
-.copy{margin-left:auto;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;transition:var(--tr);flex-shrink:0}
+.copy{margin-left:auto;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:6px 14px;font-size:11.5px;font-weight:700;cursor:pointer;transition:var(--transition);flex-shrink:0;font-family:var(--font)}
 .copy:hover{color:var(--text);border-color:var(--accent)}
+.copy.copied{color:var(--green);border-color:var(--green)}
 .alt-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.chip{font-family:var(--mono);font-size:11.5px;padding:7px 12px;border-radius:9px;border:1px dashed var(--border);color:var(--text3);cursor:pointer;transition:var(--tr)}
-.chip:hover{color:var(--accent);border-color:var(--accent)}
+.chip{font-family:var(--mono);font-size:11.5px;padding:7px 12px;border-radius:9px;border:1px dashed var(--border);color:var(--text3);cursor:pointer;transition:var(--transition);background:transparent}
+.chip:hover{color:var(--accent);border-color:var(--accent);border-style:solid}
 
-/* sections */
-section{padding:74px 0}
+/* Sections */
+section{padding:74px 22px}
 .sec-head{text-align:center;max-width:680px;margin:0 auto 46px}
 .kicker{font-size:11.5px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--accent)}
 .sec-head h2{font-size:clamp(27px,4vw,40px);font-weight:900;letter-spacing:-1.1px;margin:12px 0 12px}
 .sec-head p{color:var(--text2);font-size:15.5px;line-height:1.7}
 
-/* mechanism flow */
+/* Flow */
 .flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
-.step-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px 22px;backdrop-filter:blur(10px);position:relative;transition:var(--tr)}
+.step-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px 22px;backdrop-filter:blur(10px);position:relative;transition:var(--transition)}
 .step-card:hover{transform:translateY(-4px);border-color:rgba(246,130,31,.4)}
 .step-num{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0a0a12;font-weight:900;font-size:14px;margin-bottom:16px}
 .step-card h3{font-size:16px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px}
 .step-card p{font-size:13.5px;line-height:1.7;color:var(--text2)}
 .step-card code{font-family:var(--mono);font-size:12px;background:var(--surface2);border:1px solid var(--border);padding:1.5px 7px;border-radius:6px;color:var(--accent)}
 
-/* architecture */
-.arch{background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:34px clamp(18px,4vw,44px);backdrop-filter:blur(10px)}
+/* Architecture */
+.arch{background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:34px clamp(18px,4vw,44px);backdrop-filter:blur(10px);overflow-x:auto}
 .arch pre{font-family:var(--mono);font-size:clamp(9.5px,1.55vw,13px);line-height:1.75;color:var(--text2);white-space:pre;overflow-x:auto}
 .arch pre b{color:var(--accent);font-weight:600}
 .arch pre i{color:var(--green);font-style:normal}
@@ -89,74 +97,96 @@ section{padding:74px 0}
 .legend span::before{content:'';display:inline-block;width:8px;height:8px;border-radius:3px;margin-right:7px}
 .lg-a::before{background:var(--accent)}.lg-g::before{background:var(--green)}.lg-i::before{background:var(--indigo)}
 
-/* features */
+/* Features */
 .grid-feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:16px}
-.feat{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px;transition:var(--tr)}
+.feat{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px;transition:var(--transition);position:relative;overflow:hidden}
+.feat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;transition:opacity .3s}
 .feat:hover{border-color:rgba(246,130,31,.35);transform:translateY(-3px)}
+.feat:hover::before{opacity:1}
 .feat .ic{width:40px;height:40px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);display:grid;place-items:center;font-size:19px;margin-bottom:14px}
 .feat h3{font-size:15px;font-weight:800;margin-bottom:7px}
 .feat p{font-size:13px;line-height:1.65;color:var(--text2)}
 
-/* platforms */
-.plat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
-.plat{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;transition:var(--tr)}
-.plat:hover{border-color:var(--accent)}
-.plat h4{font-size:14px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px}
-.plat small{display:block;color:var(--text3);font-size:11.5px;margin-bottom:12px}
-.plat pre{font-family:var(--mono);font-size:11.5px;background:rgba(0,0,0,.4);[data-theme=light]& :background:rgba(0,0,0,.05);border:1px solid var(--border);border-radius:10px;padding:11px 13px;overflow-x:auto;white-space:nowrap;color:var(--text2)}
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:700px;margin:0 auto}
+.stat{text-align:center;padding:24px 12px;background:var(--surface);border:1px solid var(--border);border-radius:14px}
+.stat-num{font-size:28px;font-weight:900;color:var(--accent);letter-spacing:-.02em}
+.stat-label{font-size:11px;color:var(--text3);margin-top:4px}
 
-/* cli strip */
+/* CLI strip */
 .cli-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
-.cli-item{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:15px 17px}
-.cli-item code{font-family:var(--mono);font-size:12.5px;color:var(--accent);white-space:nowrap}
+.cli-item{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:15px 17px;transition:var(--transition)}
+.cli-item:hover{border-color:rgba(246,130,31,.2)}
+.cli-item code{font-family:var(--mono);font-size:12.5px;color:var(--accent);white-space:nowrap;flex-shrink:0}
 .cli-item span{font-size:12.5px;color:var(--text3)}
+.cli-item .cli-copy{margin-left:auto;background:var(--surface2);border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;transition:var(--transition);flex-shrink:0;font-family:var(--font)}
+.cli-item .cli-copy:hover{color:var(--accent);border-color:var(--accent)}
+.cli-item .cli-copy.copied{color:var(--green);border-color:var(--green)}
+
+/* CTA */
+.cta{padding:40px 22px 80px;text-align:center}
+.cta-box{max-width:500px;margin:0 auto;padding:48px 28px;background:var(--surface);border:1px solid var(--border);border-radius:24px;backdrop-filter:blur(40px);position:relative;overflow:hidden}
+.cta-box::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at center,color-mix(in srgb,var(--accent) 6%,transparent) 0%,transparent 60%);pointer-events:none}
+.cta-box h2{font-size:clamp(22px,4vw,28px);font-weight:800;margin-bottom:10px;letter-spacing:-.3px;position:relative}
+.cta-box p{font-size:14px;color:var(--text2);margin-bottom:24px;position:relative}
+.cta-box .btn{position:relative}
 
 footer{border-top:1px solid var(--border);padding:36px 22px;text-align:center;color:var(--text3);font-size:13px}
 footer a{color:var(--text2);text-decoration:none}
 footer .dotsep{margin:0 10px;opacity:.4}
-@media(max-width:680px){.nav-links a:not(.btn){display:none}.hero{padding:64px 0 40px}}
+@media(max-width:680px){.nav-links a:not(.btn){display:none}.hero{padding:64px 0 40px}section{padding:54px 16px}}
 </style>
 </head>
 <body>
-<div class="bg"><div class="orb orb-1"></div><div class="orb orb-2"></div></div>
-<div class="grid"></div>
+<div class="bg"><div class="bg-orb bg-orb-1"></div><div class="bg-orb bg-orb-2"></div></div>
+<div class="grid-overlay"></div>
 
-<nav><div class="nav-in">
-  <a class="logo" href="#"><span class="logo-badge">P</span>Porter<span style="color:var(--text3);font-weight:600">&nbsp;/ Tect0nic</span></a>
-  <div class="nav-links">
-    <a href="#how">How it works</a>
-    <a href="#features">Features</a>
-    <a href="#platforms">Platforms</a>
+<nav class="nav">
+  <div class="nav-left">
+    <span class="nav-logo">&#9729;</span>
+    <span class="nav-brand">Porter<span>&nbsp;/ Tect0nic</span></span>
+  </div>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#cli">CLI</a>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">&#9790;</button>
     <a class="btn btn-primary" href="#install">Install</a>
   </div>
-</div></nav>
+</nav>
 
-<header class="hero wrap">
-  <span class="pill"><span class="dot"></span>v2.0 · Multi-account · Verified connections</span>
+<header class="hero">
+  <span class="pill"><span class="dot"></span>v2.0 &middot; Multi-account &middot; Verified connections</span>
   <h1>Tunnels without the YAML.<br>Managed from <span class="grad">one portal.</span></h1>
   <p class="sub">Porter turns any machine into a Cloudflare-tunneled host in minutes.
      Link one or many Cloudflare accounts through the Tectonic Connector Portal,
-     and let Porter create tunnels, route DNS and keep credentials fresh — automatically.</p>
+     and let Porter create tunnels, route DNS and keep credentials fresh &mdash; automatically.</p>
+  <div class="hero-actions">
+    <a href="https://github.com/Th3UrBanGuy/porter" class="btn btn-lg btn-primary" target="_blank">View on GitHub</a>
+    <a href="#how" class="btn btn-lg btn-secondary">Learn More</a>
+  </div>
 
   <div class="install" id="install">
     <div class="label"><span>One-line install</span><span id="osHint"></span></div>
-    <div class="cmd" style="background:rgba(0,0,0,.45)">
+    <div class="cmd">
       <span class="p">$</span>
       <span id="cmdText">curl -fsSL https://raw.githubusercontent.com/Th3UrBanGuy/porter/self-hosted/install.sh | bash</span>
-      <button class="copy" onclick="cp(this)">Copy</button>
+      <button class="copy" onclick="cpCmd(this)">Copy</button>
     </div>
     <div class="alt-row">
-      <button class="chip" onclick="setCmd('curl -fsSL https://raw.githubusercontent.com/Th3UrBanGuy/porter/self-hosted/install.sh | bash')">Linux / macOS / Termux</button>
-      <button class="chip" onclick="setCmd('git clone --depth 1 -b self-hosted https://github.com/Th3UrBanGuy/porter.git &amp;&amp; cd porter &amp;&amp; ./install.sh --service')">From source (systemd)</button>
-      <button class="chip" onclick="setCmd('wsl --install -d Ubuntu   # then run the Linux command inside WSL')">Windows (WSL)</button>
-      <button class="chip" onclick="setCmd('./install.sh --passcode MYCODE --port 7262 --service')">Custom flags</button>
+      <button class="chip" onclick="setCmd(this,'curl -fsSL https://raw.githubusercontent.com/Th3UrBanGuy/porter/self-hosted/install.sh | bash')">Linux / macOS</button>
+      <button class="chip" onclick="setCmd(this,'curl -fsSL https://raw.githubusercontent.com/Th3UrBanGuy/porter/self-hosted/install.sh | bash')">Termux</button>
+      <button class="chip" onclick="setCmd(this,'wsl --install -d Ubuntu   # then run the Linux command inside WSL')">Windows (WSL)</button>
+      <button class="chip" onclick="setCmd(this,'git clone --depth 1 -b self-hosted https://github.com/Th3UrBanGuy/porter.git &amp;&amp; cd porter &amp;&amp; ./install.sh --service')">From source</button>
     </div>
   </div>
 </header>
 
-<section id="how" class="wrap">
+<section id="how" style="max-width:1100px;margin:0 auto">
   <div class="sec-head">
-    <div class="kicker">The mechanism</div>
+    <div class="kicker">The Mechanism</div>
     <h2>How Porter works</h2>
     <p>No dashboards to babysit, no YAML to write. Your device talks to the
        <b>Connector Portal</b>, the portal brokers your Cloudflare identity, and Porter does the rest.</p>
@@ -166,20 +196,20 @@ footer .dotsep{margin:0 10px;opacity:.4}
     <div class="step-card">
       <div class="step-num">1</div>
       <h3>Install &amp; run</h3>
-      <p>One dynamic installer detects your platform — Linux, macOS, Termux or WSL — installs Python,
+      <p>One dynamic installer detects your platform &mdash; Linux, macOS, Termux or WSL &mdash; installs Python,
          <code>cloudflared</code>, dependencies and the <code>porter</code> CLI. A systemd/launchd service keeps it alive.</p>
     </div>
     <div class="step-card">
       <div class="step-num">2</div>
       <h3>Link the Connector Portal</h3>
-      <p>Sign in with your portal account (<code>porter cf portal-login</code>). The password is exchanged
+      <p>Sign in with your portal account (<code>porter login</code>). The password is exchanged
          <b>once</b> for a scoped device API key and is never stored on the device.</p>
     </div>
     <div class="step-card">
       <div class="step-num">3</div>
-      <h3>Pick accounts · verified instantly</h3>
+      <h3>Pick accounts &middot; verified instantly</h3>
       <p>The portal lists every connected Cloudflare account. Choose <b>one or many</b>. Each pulled set is
-         proven with a forced token refresh — you see <b>VERIFIED ✓</b> or <b>FAILED ✗</b> immediately.</p>
+         proven with a forced token refresh &mdash; you see <b>VERIFIED</b> or <b>FAILED</b> immediately.</p>
     </div>
     <div class="step-card">
       <div class="step-num">4</div>
@@ -193,15 +223,15 @@ footer .dotsep{margin:0 10px;opacity:.4}
 <pre>
  <b>YOUR DEVICE</b>                                <em>TECTONIC CONNECTOR PORTAL</em>                <i>CLOUDFLARE EDGE</i>
 ┌──────────────────────┐   login (once)     ┌──────────────────────────┐
-│ porter server :7262  │ ─────────────────► │ password → device key    │
-│  config.json         │                    │ keys hashed · rate-limit │
+│ porter server :7262  │ ─────────────────► │ password &rarr; device key    │
+│  config.json         │                    │ keys hashed &middot; rate-limit │
 │  tokens.json         │   pick accounts    │ audit log                │
-│  accounts.json  ◄────┼────────────────────┤ CF accounts (AES-GCM at  │
-│  cloudflared daemon  │   pull creds       │ rest · Neon Postgres)    │
+│  accounts.json  &lt;────┼────────────────────┤ CF accounts (AES-GCM at  │
+│  cloudflared daemon  │   pull creds       │ rest &middot; Neon Postgres)    │
 │                      │                    └──────────────────────────┘
-│   forced refresh → VERIFIED ✓ / FAILED ✗                                     │
+│   forced refresh &rarr; VERIFIED / FAILED                                          │
 │                      │                                        DNS + tunnel  │
-│  app @ localhost:PORT│ ◄──────────────────────────────────────────────────────┤
+│  app @ localhost:PORT│ &lt;──────────────────────────────────────────────────────┤
 └──────────────────────┘        https://sub.your-domain.com                     ┘
 </pre>
     <div class="legend">
@@ -210,68 +240,85 @@ footer .dotsep{margin:0 10px;opacity:.4}
   </div>
 </section>
 
-<section id="features" class="wrap" style="background:var(--surface2)">
-  <div class="sec-head">
-    <div class="kicker">Why Porter</div>
-    <h2>Built for headless reality</h2>
-    <p>Raspberry Pis, VPS boxes, Termux phones, CI containers — anywhere a browser isn't guaranteed.</p>
-  </div>
-  <div class="grid-feat">
-    <div class="feat"><div class="ic">⧉</div><h3>Multi-account</h3><p>Store several Cloudflare accounts locally, switch active with one command, forget devices cleanly.</p></div>
-    <div class="feat"><div class="ic">✓</div><h3>Verified connections</h3><p>Every linked account gets exactly one forced OAuth refresh — success or failure surfaces instantly, never silently.</p></div>
-    <div class="feat"><div class="ic">↻</div><h3>Self-healing tokens</h3><p>Refresh → re-pull fallback chain keeps tunnels breathing when tokens rotate elsewhere.</p></div>
-    <div class="feat"><div class="ic">⛨</div><h3>Password never stored</h3><p>Portal passwords exchange once for a device API key. Tokens sit AES-256-GCM encrypted on the portal.</p></div>
-    <div class="feat"><div class="ic">⌘</div><h3>Full CLI parity</h3><p>Everything the web UI does lives under <code style="font-family:var(--mono);color:var(--accent)">porter cf …</code> — scriptable, SSH-friendly.</p></div>
-    <div class="feat"><div class="ic">◈</div><h3>One installer</h3><p>Detects distro, package manager, CPU arch and service manager. Same file everywhere.</p></div>
-  </div>
-</section>
-
-<section id="platforms" class="wrap">
-  <div class="sec-head">
-    <div class="kicker">Platforms</div>
-    <h2>Same installer, smart choices</h2>
-  </div>
-  <div class="plat-grid">
-    <div class="plat"><h4>🐧 Debian / Ubuntu</h4><small>apt · python3-venv handled</small><pre>curl -fsSL raw.githubusercontent.com/Th3UrBanGuy/porter/self-hosted/install.sh | bash</pre></div>
-    <div class="plat"><h4>🎩 Fedora / RHEL / Arch</h4><small>dnf · pacman · apk · zypper</small><pre>same one-liner — the installer picks your manager</pre></div>
-    <div class="plat"><h4>🍎 macOS</h4><small>Homebrew python &amp; cloudflared</small><pre>curl -fsSL .../install.sh | bash</pre></div>
-    <div class="plat"><h4>🤖 Termux</h4><small>pkg · runs on-device</small><pre>pkg install curl &amp;&amp; curl -fsSL .../install.sh | bash</pre></div>
-    <div class="plat"><h4>🪟 Windows</h4><small>WSL2 recommended</small><pre>wsl --install -d Ubuntu</pre></div>
-    <div class="plat"><h4>⚙️ Flags</h4><small>everything scriptable</small><pre>--port --passcode --service --no-start --branch --uninstall</pre></div>
+<section id="features" style="background:var(--surface2)">
+  <div style="max-width:1100px;margin:0 auto">
+    <div class="sec-head">
+      <div class="kicker">Why Porter</div>
+      <h2>Built for headless reality</h2>
+      <p>Raspberry Pis, VPS boxes, Termux phones, CI containers &mdash; anywhere a browser isn't guaranteed.</p>
+    </div>
+    <div class="grid-feat">
+      <div class="feat"><div class="ic">&#9881;</div><h3>Multi-account</h3><p>Store several Cloudflare accounts locally, switch active with one command, forget devices cleanly. Each account is independently verified.</p></div>
+      <div class="feat"><div class="ic">&#10003;</div><h3>Verified connections</h3><p>Every linked account gets exactly one forced OAuth refresh &mdash; success or failure surfaces instantly, never silently.</p></div>
+      <div class="feat"><div class="ic">&#8635;</div><h3>Self-healing tokens</h3><p>Refresh &rarr; re-pull fallback chain keeps tunnels breathing when tokens rotate elsewhere.</p></div>
+      <div class="feat"><div class="ic">&#128274;</div><h3>Password never stored</h3><p>Portal passwords exchange once for a device API key. Tokens sit AES-256-GCM encrypted on the portal.</p></div>
+      <div class="feat"><div class="ic">&#9000;</div><h3>Full CLI parity</h3><p>Everything the web UI does lives under <code style="font-family:var(--mono);color:var(--accent);font-size:12px">porter cf ...</code> &mdash; scriptable, SSH-friendly.</p></div>
+      <div class="feat"><div class="ic">&#128225;</div><h3>Short URLs</h3><p>Generate compact shareable links for any tunnel. One click to shorten, one click to copy.</p></div>
+      <div class="feat"><div class="ic">&#128640;</div><h3>Real-time progress</h3><p>Watch each tunnel creation step live with Server-Sent Events. All streamed in real time.</p></div>
+      <div class="feat"><div class="ic">&#9729;</div><h3>One installer</h3><p>Detects distro, package manager, CPU arch and service manager. Same file everywhere.</p></div>
+      <div class="feat"><div class="ic">&#128187;</div><h3>Self-hosted</h3><p>Run on your own VPS. Full control over your data. No external services required except Cloudflare.</p></div>
+    </div>
   </div>
 </section>
 
-<section class="wrap" style="background:var(--surface2)">
-  <div class="sec-head">
-    <div class="kicker">Headless CLI</div>
-    <h2>porter cf — the connector toolkit</h2>
+<section style="max-width:700px;margin:0 auto">
+  <div class="stats">
+    <div class="stat"><div class="stat-num">0</div><div class="stat-label">API Tokens</div></div>
+    <div class="stat"><div class="stat-num">5s</div><div class="stat-label">Deploy Time</div></div>
+    <div class="stat"><div class="stat-num">100%</div><div class="stat-label">Encrypted</div></div>
+    <div class="stat"><div class="stat-num">1</div><div class="stat-label">Click Setup</div></div>
   </div>
-  <div class="cli-strip">
-    <div class="cli-item"><code>porter cf portal-login [url]</code><span>link device · blank URL = primary portal</span></div>
-    <div class="cli-item"><code>porter cf connections</code><span>list portal accounts (+stored)</span></div>
-    <div class="cli-item"><code>porter cf use &lt;id&gt;</code><span>switch active · offline fallback</span></div>
-    <div class="cli-item"><code>porter cf sync</code><span>re-pull + verify active account</span></div>
-    <div class="cli-item"><code>porter cf accounts</code><span>local accounts w/ verify badges</span></div>
-    <div class="cli-item"><code>porter cf forget &lt;prefix&gt;</code><span>remove an account from device</span></div>
-    <div class="cli-item"><code>porter server start|stop|status</code><span>control the local portal server</span></div>
-    <div class="cli-item"><code>porter tunnel create|list|delete</code><span>tunnel lifecycle from terminal</span></div>
+</section>
+
+<section id="cli" style="background:var(--surface2)">
+  <div style="max-width:1100px;margin:0 auto">
+    <div class="sec-head">
+      <div class="kicker">Headless CLI</div>
+      <h2>porter &mdash; the connector toolkit</h2>
+      <p>Every feature accessible from the terminal. Scriptable, SSH-friendly, automatable.</p>
+    </div>
+    <div class="cli-strip">
+      <div class="cli-item"><code>porter login</code><span>link device to portal</span><button class="cli-copy" onclick="cpCli(this,'porter login')">Copy</button></div>
+      <div class="cli-item"><code>porter cf portal-login [url]</code><span>link device &middot; blank URL = primary</span><button class="cli-copy" onclick="cpCli(this,'porter cf portal-login')">Copy</button></div>
+      <div class="cli-item"><code>porter cf connections</code><span>list portal accounts (+stored)</span><button class="cli-copy" onclick="cpCli(this,'porter cf connections')">Copy</button></div>
+      <div class="cli-item"><code>porter cf use &lt;id&gt;</code><span>switch active &middot; offline fallback</span><button class="cli-copy" onclick="cpCli(this,'porter cf use ')">Copy</button></div>
+      <div class="cli-item"><code>porter cf sync</code><span>re-pull + verify active account</span><button class="cli-copy" onclick="cpCli(this,'porter cf sync')">Copy</button></div>
+      <div class="cli-item"><code>porter cf portal-status</code><span>portal connection status</span><button class="cli-copy" onclick="cpCli(this,'porter cf portal-status')">Copy</button></div>
+      <div class="cli-item"><code>porter cf accounts</code><span>local accounts w/ verify badges</span><button class="cli-copy" onclick="cpCli(this,'porter cf accounts')">Copy</button></div>
+      <div class="cli-item"><code>porter cf forget &lt;prefix&gt;</code><span>remove an account from device</span><button class="cli-copy" onclick="cpCli(this,'porter cf forget ')">Copy</button></div>
+      <div class="cli-item"><code>porter tunnel create &lt;sub&gt; &lt;port&gt;</code><span>expose a local service</span><button class="cli-copy" onclick="cpCli(this,'porter tunnel create  ')">Copy</button></div>
+      <div class="cli-item"><code>porter tunnels</code><span>list all active tunnels</span><button class="cli-copy" onclick="cpCli(this,'porter tunnels')">Copy</button></div>
+      <div class="cli-item"><code>porter server start|stop|status</code><span>control the local server</span><button class="cli-copy" onclick="cpCli(this,'porter server start')">Copy</button></div>
+      <div class="cli-item"><code>porter shorturl &lt;url&gt;</code><span>shorten a tunnel URL</span><button class="cli-copy" onclick="cpCli(this,'porter shorturl ')">Copy</button></div>
+    </div>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="cta-box">
+    <h2>Ready to go live?</h2>
+    <p>Set up in under 2 minutes. No API tokens required.</p>
+    <a href="#install" class="btn btn-lg btn-primary">Install Now</a>
   </div>
 </section>
 
 <footer>
-  Built by <b>Tect0nic</b><span class="dotsep">·</span><a href="https://Tect0nic.com">Tect0nic.com</a>
-  <span class="dotsep">·</span>Porter works with any standard Cloudflare account.
+  Built by <b>Tect0nic</b><span class="dotsep">&middot;</span><a href="https://Tect0nic.com">Tect0nic.com</a>
+  <span class="dotsep">&middot;</span>Porter works with any standard Cloudflare account.
 </footer>
 
 <script>
 const RAW='https://raw.githubusercontent.com/Th3UrBanGuy/porter/self-hosted/install.sh';
-function setCmd(t){document.getElementById('cmdText').textContent=t.replace('.../install.sh',RAW);}
-function cp(b){navigator.clipboard.writeText(document.getElementById('cmdText').textContent).then(()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1600);});}
+function setCmd(btn,t){document.getElementById('cmdText').textContent=t.replace('.../install.sh',RAW);document.querySelectorAll('.chip').forEach(c=>c.style.borderColor='');btn.style.borderColor='var(--accent)';btn.style.borderStyle='solid';}
+function cpCmd(b){navigator.clipboard.writeText(document.getElementById('cmdText').textContent).then(()=>{b.textContent='Copied!';b.classList.add('copied');setTimeout(()=>{b.textContent='Copy';b.classList.remove('copied');},1600);});}
+function cpCli(b,t){navigator.clipboard.writeText(t).then(()=>{b.textContent='Copied!';b.classList.add('copied');setTimeout(()=>{b.textContent='Copy';b.classList.remove('copied');},1600);});}
 const h=document.getElementById('osHint');
-if(/Win/i.test(navigator.platform)) h.textContent='tip: run inside WSL';
-else if(/Android/i.test(navigator.userAgent)) h.textContent='termux detected';
-else if(/Mac/i.test(navigator.platform)) h.textContent='macOS';
+if(/Win/i.test(navigator.platform))h.textContent='tip: run inside WSL';
+else if(/Android/i.test(navigator.userAgent))h.textContent='termux detected';
+else if(/Mac/i.test(navigator.platform))h.textContent='macOS';
 else h.textContent='Linux';
+const savedTheme=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',savedTheme);document.getElementById('themeBtn').textContent=savedTheme==='dark'?'\u263C':'\u263E';
+function toggleTheme(){const h=document.documentElement,c=h.getAttribute('data-theme'),n=c==='dark'?'light':'dark';h.setAttribute('data-theme',n);localStorage.setItem('theme',n);document.getElementById('themeBtn').textContent=n==='dark'?'\u263C':'\u263E'}
 </script>
 </body>
 </html>

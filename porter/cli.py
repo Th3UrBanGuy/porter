@@ -41,54 +41,65 @@ HELP = f"""\
 {out.c('USAGE', 'cyan')}
     porter <group> <command> [args]  [flags]
 
-{out.c('GUI', 'cyan')}
-    porter gui                       Open the web dashboard in browser
+{out.c('QUICK START', 'cyan')}
+    porter login                      Link device to the Connector Portal
+    porter gui                        Open the web dashboard in browser
 
 {out.c('SERVER', 'cyan')}
-    porter server start              Start the server
-    porter server stop               Stop the server
-    porter server restart            Restart the server
-    porter server status             Check if server is running
-    porter server logs [n]           Show last n lines of logs
-    porter server logs --follow      Tail logs in real time
-    porter server deps               Install Python dependencies
+    porter server start               Start the server
+    porter server stop                Stop the server
+    porter server restart             Restart the server
+    porter server status              Check if server is running
+    porter server logs [n]            Show last n lines of logs
+    porter server logs --follow       Tail logs in real time
+    porter server deps                Install Python dependencies
 
 {out.c('CLOUDFLARE', 'cyan')}
-    porter cf connect                Connect Cloudflare account (OAuth)
-    porter cf status                 Check Cloudflare connection
-    porter cf disconnect             Disconnect from Cloudflare
-    porter cf refresh                Refresh OAuth token
+    porter cf connect                 Connect Cloudflare account (OAuth)
+    porter cf status                  Check Cloudflare connection
+    porter cf disconnect              Disconnect from Cloudflare
+    porter cf refresh                 Refresh OAuth token
+    porter cf portal-login [url]      Link device to the Connector Portal
+    porter cf portal-status           Show portal connection status
+    porter cf connections             List Connector Portal connections
+    porter cf use <id>                Switch active connector connection
+    porter cf sync                    Re-pull + verify active account
+    porter cf accounts                List accounts stored on device
+    porter cf forget <id>             Remove an account from device
 
 {out.c('TUNNELS', 'cyan')}
-    porter tunnels                   List all active tunnels
+    porter tunnels                    List all active tunnels
     porter tunnel create <sub> <port> Expose localhost:<port> on <sub>
-    porter tunnel stop <subdomain>   Stop a tunnel
-    porter tunnel restart            Restart cloudflared
+    porter tunnel stop <subdomain>    Stop a tunnel
+    porter tunnel restart             Restart cloudflared
+
+{out.c('SHORT URL', 'cyan')}
+    porter shorturl <url>             Shorten a URL (via is.gd)
 
 {out.c('DOMAINS', 'cyan')}
-    porter domains                   List Cloudflare zones
-    porter domain active             Show/set active domain
+    porter domains                    List Cloudflare zones
+    porter domain active              Show/set active domain
 
 {out.c('PORTS', 'cyan')}
-    porter ports                     List listening ports
-    porter ports check <port>        Check if a port is in use
-    porter ports pid <port>          Get PID using a port
+    porter ports                      List listening ports
+    porter ports check <port>         Check if a port is in use
+    porter ports pid <port>           Get PID using a port
 
 {out.c('API KEYS', 'cyan')}
-    porter keys                      List all API keys
-    porter keys create <name>        Create a new API key
-    porter keys delete <id>          Delete an API key
+    porter keys                       List all API keys
+    porter keys create <name>         Create a new API key
+    porter keys delete <id>           Delete an API key
 
 {out.c('CONFIG', 'cyan')}
-    porter config                    Show current config
-    porter config set <key> <value>  Set a config value
-    porter config get <key>          Get a config value
-    porter config unset <key>        Remove a config key
+    porter config                     Show current config
+    porter config set <key> <value>   Set a config value
+    porter config get <key>           Get a config value
+    porter config unset <key>         Remove a config key
 
 {out.c('SETUP', 'cyan')}
-    porter setup                     Run interactive setup wizard
-    porter install                   Full install (deps + CLI + config)
-    porter platform                  Show platform info
+    porter setup                      Run interactive setup wizard
+    porter install                    Full install (deps + CLI + config)
+    porter platform                   Show platform info
 
 {out.c('FLAGS', 'cyan')}
     --url <url>          Server URL  (overrides config)
@@ -100,10 +111,12 @@ HELP = f"""\
     --version, -v        Show version
 
 {out.c('EXAMPLES', 'cyan')}
+    porter login                              Link device to portal
     porter gui                                Open dashboard in browser
-    porter cf connect                         First-time setup
+    porter cf connect                         First-time Cloudflare setup
     porter tunnel create panel 7262           panel.domain -> localhost:7262
     porter tunnel create api 8080 --protocol quic
+    porter shorturl https://sub.domain.com    Shorten a tunnel URL
     porter keys create github-action          CI/CD key
     porter config set server https://vps:7262 Remote server
     porter server start                       Start the portal
@@ -165,6 +178,15 @@ def cmd_gui(args):
     else:
         out.warning("Could not open browser automatically")
         out.info(f"Open manually: {url}")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Commands: login (top-level alias for portal-login)
+# ═══════════════════════════════════════════════════════════════
+
+def cmd_login(args):
+    """Link device to the Tectonic Connector Portal (alias for cf portal-login)."""
+    _cf_portal_login(args)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -267,6 +289,9 @@ def cmd_cf(args):
     elif action == "forget":
         _cf_portal_forget(getattr(args, "cf_value", None))
 
+    elif action in ("portal-status", "portal-status"):
+        _cf_portal_status()
+
     else:
         _cf_help()
 
@@ -295,11 +320,21 @@ def _write_json(path, data):
 def _require_connector_libs():
     try:
         import httpx  # noqa: F401
-        import portal_client
-        return portal_client
     except ImportError as e:
         out.error(f"Missing dependency: {e}")
         out.info("Run: pip install httpx")
+        sys.exit(1)
+
+    # Import portal_client from project root
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    try:
+        import portal_client
+        return portal_client
+    except ImportError as e:
+        out.error(f"Cannot import portal_client: {e}")
+        out.info("Ensure portal_client.py is in the Porter project root")
         sys.exit(1)
 
 
@@ -610,18 +645,73 @@ def _cf_portal_sync():
         sys.exit(1)
 
 
+def _cf_portal_status():
+    """Show portal connection status."""
+    config_file, _ = _paths()
+    cfg = _read_json(config_file)
+    url = cfg.get("portal_url") or DEFAULT_PORTAL_URL
+    api_key = cfg.get("portal_api_key")
+    conn_id = cfg.get("portal_connection_id")
+
+    out.header("Portal Connection Status")
+    out.table_row("Portal URL", url)
+
+    if api_key:
+        masked = f"{api_key[:8]}...{api_key[-4:]}" if len(api_key) > 12 else "***"
+        out.table_row("API Key", masked)
+    else:
+        out.table_row("API Key", f"{out.c('not set', 'yellow')}")
+
+    if conn_id:
+        out.table_row("Active Account", conn_id[:12] + "...")
+    else:
+        out.table_row("Active Account", f"{out.c('none', 'yellow')}")
+
+    # Check stored accounts
+    from cloudflare_client import load_accounts
+    accounts = load_accounts()
+    out.table_row("Stored Accounts", str(len(accounts)))
+
+    if accounts:
+        print()
+        for a in sorted(accounts.values(), key=lambda x: x.get("added_at") or 0):
+            marker = " *active*" if a["id"] == conn_id else ""
+            lv = a.get("last_verify")
+            if lv:
+                badge = out.c("verified", "green") if lv.get("ok") else out.c("failed", "red")
+                extra = f"  ({badge})"
+            else:
+                extra = ""
+            name = a.get("account_name") or a.get("label") or a["id"][:8]
+            out.table_row(f"  {name}", out.dim(a["id"][:8]), (marker + extra).strip())
+
+    # Check if we can reach the portal
+    print()
+    pc = _require_connector_libs()
+    try:
+        conns = pc.list_connections(url, api_key)
+        out.success(f"Portal reachable ({len(conns)} connection{'s' if len(conns) != 1 else ''})")
+    except pc.PortalError as e:
+        out.warning(f"Portal unreachable: {str(e)[:80]}")
+    except Exception as e:
+        out.warning(f"Portal check failed: {str(e)[:80]}")
+
+    print()
+
+
 def _cf_help():
     out.error("Missing cloudflare action")
     print()
     out.info("Usage: porter cf <action>")
     print()
     out.info("Actions:")
-    out.bullet("porter cf connect                Connect Cloudflare account")
-    out.bullet("porter cf status                 Check connection status")
+    out.bullet("porter cf connect                Connect Cloudflare account (OAuth)")
+    out.bullet("porter cf status                 Check Cloudflare connection status")
     out.bullet("porter cf disconnect             Disconnect from Cloudflare")
     out.bullet("porter cf refresh                Refresh OAuth token")
-    out.bullet("porter cf portal-login [url]     Pull credentials from the Tectonic Connector Portal (headless)")
-    out.bullet("porter cf connections            List Connector Portal Cloudflare connections")
+    out.bullet("porter cf portal-login [url]     Link device to the Connector Portal")
+    out.bullet("porter cf portal-status           Show portal connection status")
+    out.bullet("porter cf connections            List Connector Portal connections")
     out.bullet("porter cf use <connection-id>    Switch active connector connection")
     out.bullet("porter cf sync                   Force re-pull active connector connection")
     out.bullet("porter cf accounts               List accounts stored on this device")
@@ -798,6 +888,55 @@ def _tunnel_help():
     out.bullet("porter tunnel restart               Restart cloudflared")
     print()
     sys.exit(1)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Commands: shorturl
+# ═══════════════════════════════════════════════════════════════
+
+def cmd_shorturl(args):
+    """Shorten a URL using is.gd (free, no API key required)."""
+    url = getattr(args, "url", None)
+    if not url:
+        out.error("Missing URL")
+        out.info("Usage: porter shorturl <url>")
+        print()
+        sys.exit(1)
+
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    out.info(f"Shortening: {url}")
+
+    try:
+        import httpx
+        from urllib.parse import quote
+
+        api_url = f"https://is.gd/create.php?format=json&url={quote(url, safe='')}"
+        resp = httpx.get(api_url, timeout=10, headers={"User-Agent": "Porter-CLI/2.0"})
+        data = resp.json()
+        short_url = data.get("shorturl")
+        if short_url:
+            out.success(f"Short URL: {short_url}")
+            # Try to copy to clipboard
+            try:
+                import subprocess
+                if sys.platform == "darwin":
+                    subprocess.run(["pbcopy"], input=short_url.encode(), check=True)
+                elif sys.platform.startswith("linux"):
+                    subprocess.run(["xclip", "-selection", "clipboard"], input=short_url.encode(), check=True)
+                out.info("Copied to clipboard")
+            except Exception:
+                pass
+        else:
+            out.error("Shortening failed")
+            sys.exit(1)
+    except ImportError:
+        out.error("httpx is required: pip install httpx")
+        sys.exit(1)
+    except Exception as e:
+        out.error(f"Failed: {e}")
+        sys.exit(1)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1302,16 +1441,25 @@ def cmd_setup(args):
                 out.success("Passcode saved")
         print()
 
-    # Step 3: Cloudflare
+    # Step 3: Cloudflare / Portal
     out.info("Step 3: Connect Cloudflare")
-    choice = input("  Connect now? [Y/n]: ").strip().lower()
-    if choice != "n":
+    out.info("  1) OAuth (browser-based, local machine)")
+    out.info("  2) Tectonic Connector Portal (headless/VPS)")
+    out.info("  3) Skip")
+    choice = input("  Choice [1]: ").strip() or "1"
+    print()
+
+    if choice == "1":
         try:
             from porter.cloudflare import CloudflareCLI
             cf = CloudflareCLI()
             cf.connect()
         except ImportError:
             out.error("httpx required: pip install httpx")
+    elif choice == "2":
+        _cf_portal_login(argparse.Namespace(cf_value=None))
+    else:
+        out.info("Skipped. Run 'porter login' or 'porter cf connect' later.")
     print()
 
     # Step 4: First tunnel
@@ -1523,6 +1671,14 @@ def main():
     p_gui = sub.add_parser("gui", add_help=False)
     p_gui.add_argument("--dev", action="store_true", help=argparse.SUPPRESS)
 
+    # -- login (top-level alias for portal-login) --
+    p_login = sub.add_parser("login", add_help=False)
+    p_login.add_argument("cf_value", nargs="?", help=argparse.SUPPRESS)
+
+    # -- shorturl --
+    p_shorturl = sub.add_parser("shorturl", add_help=False)
+    p_shorturl.add_argument("url", nargs="?", help=argparse.SUPPRESS)
+
     # -- server --
     p_server = sub.add_parser("server", add_help=False)
     p_server.add_argument("server_action", nargs="?", help=argparse.SUPPRESS)
@@ -1621,6 +1777,8 @@ def main():
 
     cmd_map = {
         "gui": cmd_gui,
+        "login": cmd_login,
+        "shorturl": cmd_shorturl,
         "server": cmd_server,
         "cf": cmd_cf,
         "cloudflare": cmd_cf,

@@ -111,6 +111,9 @@
   [data-theme="light"] .btn-red{color:#dc2626}
   .btn-red:hover{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.2)}
   .btn-sm{padding:7px 14px;font-size:11px;border-radius:8px}
+  .btn-short{color:var(--cyan);border-color:rgba(6,182,212,.12)}
+  .btn-short:hover{background:rgba(6,182,212,.06);border-color:rgba(6,182,212,.2)}
+  [data-theme="light"] .btn-short{color:#0891b2}
 
   .tunnel-list{display:flex;flex-direction:column;gap:8px}
   .tunnel-empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:13px;line-height:1.6}
@@ -310,6 +313,7 @@
         </div>
         <div class="tunnel-actions">
           <button class="btn btn-ghost btn-sm" onclick="copyURL('{{ t.url }}')">Copy</button>
+          <button class="btn btn-ghost btn-sm btn-short" onclick="shortenURL('{{ t.url }}', this)">Shorten</button>
           <button class="btn btn-red btn-sm" onclick="stopTunnel('{{ key }}')">Stop</button>
         </div>
       </div>
@@ -392,6 +396,30 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 function toast(msg, type) { const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast show ' + type; setTimeout(() => t.className = 'toast', 3000); }
 function copyURL(url) { navigator.clipboard.writeText(url).then(() => toast('Copied!', 'ok')); }
+async function shortenURL(url, btn) {
+  const orig = btn.textContent;
+  btn.textContent = '...';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/shorturl?url=' + encodeURIComponent(url));
+    const data = await res.json();
+    if (data.shorturl) {
+      navigator.clipboard.writeText(data.shorturl).then(() => {
+        toast('Short URL copied!', 'ok');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);
+      });
+    } else {
+      toast(data.error || 'Failed to shorten', 'err');
+      btn.textContent = orig;
+      btn.disabled = false;
+    }
+  } catch(e) {
+    toast('Connection error', 'err');
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
+}
 function switchDomain(d) { fetch('/api/domains/active', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({domain: d}) }).then(() => location.reload()); }
 
 function resetSteps() {

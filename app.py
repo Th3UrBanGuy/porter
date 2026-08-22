@@ -1015,6 +1015,39 @@ def api_scan_ports():
     return jsonify({"open_ports": open_ports})
 
 
+@app.route("/api/shorturl", methods=["GET"])
+@passcode_required
+def api_shorturl():
+    """Shorten a URL using is.gd (free, no API key required)."""
+    from urllib.parse import quote
+    import urllib.request
+    import urllib.error
+
+    url = request.args.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "url parameter is required"}), 400
+
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    try:
+        api_url = f"https://is.gd/create.php?format=json&url={quote(url, safe='')}"
+        req = urllib.request.Request(api_url, headers={"User-Agent": "Porter/2.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+            short_url = data.get("shorturl")
+            if short_url:
+                return jsonify({"success": True, "shorturl": short_url, "original": url})
+            else:
+                return jsonify({"error": "Shortening failed"}), 500
+    except urllib.error.URLError as e:
+        log.warning("Short URL service error: %s", e)
+        return jsonify({"error": f"Short URL service unavailable: {e}"}), 502
+    except Exception as e:
+        log.warning("Short URL error: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/domains", methods=["GET"])
 @passcode_required
 def api_get_domains():
