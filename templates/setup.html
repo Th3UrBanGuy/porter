@@ -122,6 +122,19 @@
     {% if success %}
     <div class="alert alert-success">{{ success }}</div>
     {% endif %}
+    {% if connect_results %}
+    <div style="margin:-8px 0 14px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);font-size:12px">
+      {% for r in connect_results %}
+      <div style="display:flex;gap:8px;align-items:baseline;padding:2px 0">
+        <span style="font-weight:700;color:{{ '#16a34a' if r.ok else '#dc2626' }}">{{ 'VERIFIED' if r.ok else 'FAILED' }}</span>
+        <span style="color:var(--text)">{{ r.label }}</span>
+        <span style="color:var(--text3);flex:1">{{ r.detail }}</span>
+      </div>
+      {% endfor %}
+      {% set failed = connect_results | selectattr('ok', 'equalto', false) | list | length %}
+      {% if failed %}<div style="margin-top:6px;color:var(--text3)">Failed accounts were still saved — switch &amp; retry from the account list below.</div>{% endif %}
+    </div>
+    {% endif %}
 
     <div class="step {{ 'done' if is_connected else 'active' }}">
       <div class="step-head">
@@ -137,42 +150,75 @@
           </form>
         </div>
         {% if cfg.get('portal_url') %}
-        <p style="margin:10px 0 0;font-size:11px;color:var(--text3)">via Porter Broker: {{ cfg.get('portal_url') }}</p>
+        <p style="margin:10px 0 0;font-size:11px;color:var(--text3)">via Tectonic Connector Portal: {{ cfg.get('portal_url') }}</p>
+        {% if cfg.get('portal_accounts') %}
+          <div style="margin:12px 0 0;padding-top:12px;border-top:1px dashed var(--border)">
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Linked accounts ({{ cfg['portal_accounts'] | length }})</div>
+            {% for a in cfg['portal_accounts'] %}
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px">
+              <span style="color:{{ '#f6821f' if a.id == cfg.get('portal_connection_id') else 'var(--text3)' }};font-size:14px">{{ '&#9679;' | safe if a.id == cfg.get('portal_connection_id') else '&#9675;' | safe }}</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.label or a.id[:8] }}{% if a.account_name %} <span style="color:var(--text3);font-weight:400">— {{ a.account_name }}</span>{% endif %}</div>
+                {% if a.last_verify %}
+                <div style="font-size:11px;color:{{ '#16a34a' if a.last_verify.ok else '#dc2626' }}">{{ 'verified' if a.last_verify.ok else 'verify failed' }} · {{ a.last_verify.detail }}</div>
+                {% endif %}
+              </div>
+              {% if a.id != cfg.get('portal_connection_id') %}
+              <form method="POST" style="display:inline">
+                <input type="hidden" name="action" value="use_portal_account">
+                <input type="hidden" name="account_id" value="{{ a.id }}">
+                <button type="submit" class="btn btn-outline btn-sm" style="padding:4px 10px;font-size:11px">Set active</button>
+              </form>
+              {% endif %}
+              <form method="POST" style="display:inline" onsubmit="return confirm('Forget this account on this device?')">
+                <input type="hidden" name="action" value="forget_portal_account">
+                <input type="hidden" name="account_id" value="{{ a.id }}">
+                <button type="submit" class="btn btn-outline btn-sm" style="padding:4px 10px;font-size:11px;color:#dc2626;border-color:rgba(220,38,38,.4)">Forget</button>
+              </form>
+            </div>
+            {% endfor %}
+          </div>
+        {% endif %}
         {% endif %}
       {% else %}
         <div style="margin-left:40px">
           <a href="/auth/cloudflare" class="btn btn-primary" style="text-decoration:none;display:inline-block">Connect Cloudflare</a>
         </div>
+      {% endif %}
 
-        <div style="margin:18px 40px 0;padding-top:16px;border-top:1px dashed var(--border)">
-          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">No browser here? Connect via Porter Broker</div>
+      {% if (not is_connected) or portal_picker %}
+        <div style="margin:18px 0 0 40px;padding-top:16px;border-top:1px dashed var(--border)">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">{% if is_connected %}Add another account via Tectonic Connector Portal{% else %}No browser here? Connect via Tectonic Connector Portal{% endif %}</div>
 
           {% if portal_connections %}
             <form method="POST">
               <input type="hidden" name="action" value="connect_portal">
               <input type="hidden" name="portal_url" value="{{ cfg.get('portal_url','') }}">
-              <div class="field" style="margin-bottom:10px">
-                <select name="connection_id" required style="width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;font-weight:500;outline:none;font-family:var(--font)">
-                  {% for c in portal_connections %}
-                  <option value="{{ c.id }}">{{ c.label }}{% if c.cf_account_name %} &mdash; {{ c.cf_account_name }}{% endif %}</option>
-                  {% endfor %}
-                </select>
+              <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Select the account{{ 's' if portal_connections | length > 1 else '' }} to add to this device:</div>
+              <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+                {% for c in portal_connections %}
+                <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;background:var(--surface2)">
+                  <input type="checkbox" name="connection_ids" value="{{ c.id }}" style="accent-color:#f6821f;width:15px;height:15px">
+                  <span style="color:var(--text);font-weight:500">{{ c.label }}{% if c.cf_account_name %} <span style="color:var(--text3);font-weight:400">&mdash; {{ c.cf_account_name }}</span>{% endif %}</span>
+                  <span style="margin-left:auto;color:var(--text3);font-size:10.5px;font-family:monospace">{{ c.id[:8] }}</span>
+                </label>
+                {% endfor %}
               </div>
-              <button type="submit" class="btn btn-outline btn-sm">Use this account</button>
+              <button type="submit" class="btn btn-outline btn-sm">Add selected account{{ 's' if portal_connections | length > 1 else '' }}</button>
             </form>
           {% else %}
             <form method="POST">
               <input type="hidden" name="action" value="connect_portal">
               <div class="field" style="margin-bottom:10px">
-                <input type="text" name="portal_url" placeholder="Broker URL (e.g. porter-broker.vercel.app)" value="{{ cfg.get('portal_url','') }}">
+                <input type="text" name="portal_url" placeholder="Connector Portal URL (blank = porter-connector.vercel.app)" value="{{ cfg.get('portal_url','') }}">
               </div>
               <div class="field" style="margin-bottom:10px">
-                <input type="text" name="portal_identifier" placeholder="Broker email or username" autocomplete="off">
+                <input type="text" name="portal_identifier" placeholder="Portal email or username" autocomplete="off">
               </div>
               <div class="field" style="margin-bottom:12px">
-                <input type="password" name="portal_password" placeholder="Broker password" autocomplete="off">
+                <input type="password" name="portal_password" placeholder="Portal password" autocomplete="off">
               </div>
-              <button type="submit" class="btn btn-outline btn-sm">Connect via Broker</button>
+              <button type="submit" class="btn btn-outline btn-sm">Connect via Connector Portal</button>
             </form>
           {% endif %}
           <p style="margin:8px 0 0;font-size:11px;color:var(--text3)">Your password is exchanged once for a device API key and never stored.</p>

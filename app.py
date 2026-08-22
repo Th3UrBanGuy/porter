@@ -61,6 +61,9 @@ def _port_is_available(port):
 
 PORT = _resolve_port()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Primary Connector Portal — used when the user does not supply one.
+DEFAULT_PORTAL_URL = "https://porter-connector.vercel.app"
 LOG_FILE = os.path.join(BASE_DIR, "portal.log")
 
 # --- Logging with rotation (graceful fallback for read-only filesystems) ---
@@ -290,6 +293,7 @@ def dashboard():
         is_connected=is_connected,
         tunnel_health=health,
         protocol=manager.get_protocol(),
+        cfg=cfg,
     )
 
 
@@ -299,31 +303,13 @@ def docs():
     return render_template("docs.html")
 
 
-def _apply_broker_payload(payload):
-    """
-    Write a broker token payload ({client_info, tokens}) into tokens.json,
-    keeping any locally-registered OAuth client intact. Returns the account
-    label from the payload when available.
-    """
-    tokens = payload.get("tokens") or {}
-    client_info = payload.get("client_info")
-    if isinstance(client_info, dict) and client_info.get("client_id"):
-        tokens.setdefault("client_id", client_info["client_id"])
-
-    storage = TokenStorage()
-    existing_client = storage.get_client_info()
-    storage.set_tokens(tokens)
-    if (
-        isinstance(client_info, dict)
-        and client_info.get("client_id")
-        and not (isinstance(existing_client, dict) and existing_client.get("client_id"))
-    ):
-        storage.set_client_info(client_info)
-    return True
-
-
 def _handle_connect_portal(cfg, is_connected, setup_done):
-    """Setup action: pull Cloudflare credentials from the Porter Broker."""
+    """Setup action: pull Cloudflare credentials from the Connector Portal.
+
+    Supports adding MULTIPLE accounts: every selected connection is pulled,
+    stored locally and verified with one forced token refresh so success or
+    failure is immediately visible.
+    """
     from portal_client import (
         PortalError,
         exchange_credentials,
@@ -331,8 +317,14 @@ def _handle_connect_portal(cfg, is_connected, setup_done):
         pull_token,
         save_portal_settings,
     )
+    from cloudflare_client import (
+        upsert_account,
+        activate_account,
+        verify_payload,
+    )
 
-    def _render(error=None, success=None, portal_connections=None):
+    def _render(error=None, success=None, portal_connections=None,
+                connect_results=None, portal_picker=False):
         return render_template(
             "setup.html",
             error=error,
@@ -341,25 +333,43 @@ def _handle_connect_portal(cfg, is_connected, setup_done):
             is_connected=is_connected,
             setup_done=setup_done,
             portal_connections=portal_connections or [],
+            connect_results=connect_results or [],
+            portal_picker=portal_picker,
         )
 
     portal_url = request.form.get("portal_url", "").strip()
     identifier = request.form.get("portal_identifier", "").strip()
     password = request.form.get("portal_password", "")
-    connection_id = request.form.get("connection_id", "").strip()
+    # Multi-select checkboxes first, single-select dropdown kept for compat.
+    selected = [s.strip() for s in request.form.getlist("connection_ids") if s.strip()]
+    if not selected:
+        legacy_single = request.form.get("connection_id", "").strip()
+        if legacy_single:
+            selected = [legacy_single]
 
     try:
         api_key = cfg.get("portal_api_key")
 
         # First step: exchange credentials for a device API key.
         if password:
+            # Priority: entered URL -> previously saved URL -> primary portal.
+            portal_url = (
+                portal_url
+                or cfg.get("portal_url", "")
+                or DEFAULT_PORTAL_URL
+            )
             if not identifier:
                 return _render(error="Email/username is required")
+            api_key = exchange_credentials(portal_url, identifier, password)
+        else:
+            # Account-picker step: reuse the already-authenticated connection.
+            portal_url = portal_url or cfg.get("portal_url", "")
             if not portal_url:
                 return _render(error="Portal URL is required")
-            api_key = exchange_credentials(portal_url, identifier, password)
-        elif not api_key:
+        if not api_key and not password:
             return _render(error="Enter your portal email/username and password")
+        if not portal_url:
+            return _render(error="Portal URL is required")
 
         # Persist url+key immediately so the account-picker step works.
         fresh = _load_config()
@@ -373,24 +383,52 @@ def _handle_connect_portal(cfg, is_connected, setup_done):
         conns = list_connections(base, api_key)
         if not conns:
             return _render(
-                error="No Cloudflare connections on the broker — connect one "
-                      "on the broker dashboard first, then try again."
+                error="No Cloudflare connections in that portal — connect one "
+                      "in the Tectonic Connector Portal dashboard first."
             )
 
-        # Multiple accounts and none picked yet -> show picker.
-        if len(conns) > 1 and not connection_id:
-            return _render(portal_connections=conns)
+        # Multiple accounts and none picked yet -> ask which to add.
+        if len(conns) > 1 and not selected:
+            return _render(portal_connections=conns, portal_picker=True)
 
-        chosen = next((c for c in conns if c["id"] == connection_id), conns[0])
-        payload = pull_token(base, api_key, chosen["id"])
-        _apply_broker_payload(payload)
+        by_id = {c["id"]: c for c in conns}
+        chosen_ids = [cid for cid in selected if cid in by_id]
+        unknown = [cid for cid in selected if cid not in by_id]
+        if not chosen_ids:
+            return _render(error="Select at least one account to add")
 
+        results = []
+        for cid in chosen_ids:
+            conn = by_id[cid]
+            label = conn.get("cf_account_name") or conn.get("label") or cid[:8]
+            try:
+                payload = pull_token(base, api_key, cid)
+            except PortalError as e:
+                results.append({"id": cid, "label": label, "ok": False, "detail": str(e)[:140]})
+                continue
+            ok, detail = verify_payload(payload)
+            upsert_account(cid, label=conn.get("label", ""),
+                           account_name=conn.get("cf_account_name", ""),
+                           payload=payload,
+                           verify={"ok": ok, "detail": detail, "ts": int(time.time())})
+            results.append({"id": cid, "label": label, "ok": ok, "detail": detail})
+            log.info("Portal account %s added (verify=%s): %s", cid, ok, detail)
+
+        # Prefer the first verified account; fall back to first selected.
+        ok_ids = [r["id"] for r in results if r["ok"]]
+        active_id = ok_ids[0] if ok_ids else chosen_ids[0]
+        activate_account(active_id, base_url=base, api_key=api_key)
         fresh = _load_config()
-        save_portal_settings(fresh, base, api_key, chosen["id"])
+        save_portal_settings(fresh, base, api_key, active_id)
         _save_config(fresh)
 
-        log.info("Connected via Porter Broker (connection=%s)", chosen["id"])
-        return _render(success=f"Connected via Porter Broker — {chosen['label']}")
+        added = len([r for r in results])
+        failed = len([r for r in results if not r["ok"]])
+        summary = f"Added {added} account{'s' if added != 1 else ''} via Porter Connector"
+        if failed:
+            summary += f" — {failed} verification failed"
+        log.info("Connected via Tectonic Connector Portal (%d accounts)", added)
+        return _render(success=summary, connect_results=results, portal_picker=True)
     except PortalError as e:
         return _render(error=str(e))
     except Exception as e:
@@ -418,6 +456,41 @@ def setup():
 
         elif action == "connect_portal":
             return _handle_connect_portal(cfg, is_connected, setup_done)
+
+        elif action == "use_portal_account":
+            from cloudflare_client import activate_account, verify_connection
+            acct_id = request.form.get("account_id", "").strip()
+            if not acct_id or not activate_account(acct_id):
+                return render_template(
+                    "setup.html", error="That account is not stored on this device.",
+                    cfg=_load_config(), is_connected=is_connected,
+                    setup_done=setup_done)
+            ok, detail = verify_connection()
+            entry = next((a for a in _load_config().get("portal_accounts", [])
+                          if a.get("id") == acct_id), {})
+            name = entry.get("account_name") or entry.get("label") or acct_id[:8]
+            if ok:
+                return render_template(
+                    "setup.html",
+                    success=f"Active account switched to {name} — verified ({detail})",
+                    cfg=_load_config(), is_connected=True, setup_done=setup_done)
+            return render_template(
+                "setup.html",
+                success=f"Active account switched to {name} — verification FAILED: {detail}",
+                cfg=_load_config(), is_connected=is_connected, setup_done=setup_done)
+
+        elif action == "forget_portal_account":
+            from cloudflare_client import forget_account
+            acct_id = request.form.get("account_id", "").strip()
+            if acct_id and forget_account(acct_id):
+                oauth_now = CloudflareOAuth()
+                return render_template(
+                    "setup.html", success="Account removed from this device.",
+                    cfg=_load_config(),
+                    is_connected=oauth_now.is_authenticated(), setup_done=setup_done)
+            return render_template(
+                "setup.html", error="Could not remove that account.",
+                cfg=_load_config(), is_connected=is_connected, setup_done=setup_done)
 
         elif action == "set_passcode":
             passcode = request.form.get("passcode", "").strip()

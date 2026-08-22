@@ -125,9 +125,9 @@
 </div>
 
 <div class="hero">
-  <h1><span>Cloudflare</span> Tunnel Portal</h1>
+  <h1><span>Porter</span> Documentation</h1>
   <p>One-click port forwarding to your own subdomain. OAuth-powered. No API tokens needed.</p>
-  <div class="badge">v2.0.0</div>
+  <div class="badge">Tect0nic</div>
 </div>
 
 <div class="container">
@@ -247,12 +247,20 @@
     <h2>5. First-Time Setup</h2>
     <h3>One-Line Install (Recommended)</h3>
     <pre><code># Linux, macOS, Windows (Git Bash/WSL), Termux
-curl -fsSL https://tinyurl.com/2ctqvyfp | bash
+# Linux, macOS, Termux
+curl -fsSL https://raw.githubusercontent.com/Th3UrBanGuy/porter/self-hosted/install.sh | bash
 
-# Windows PowerShell (two-step, most reliable)
-curl.exe -fsSL https://tinyurl.com/2ctqvyfp -o install.sh
-bash install.sh</code></pre>
+# Windows PowerShell / WSL
+irm https://raw.githubusercontent.com/Th3UrBanGuy/porter/self-hosted/install.sh -OutFile install.sh; bash install.sh</code></pre>
     <p>The installer auto-detects your platform, installs Python, pip, cloudflared, and all dependencies.</p>
+    <h3>Installer flags</h3>
+    <pre><code>--dir PATH       install location   (default ~/porter)
+--port N         dashboard port     (default 7262)
+--passcode PASS  pre-set passcode
+--service        register systemd/launchd autostart
+--no-start       don't launch after install
+--branch NAME    source branch      (default self-hosted)
+--uninstall      remove Porter + services</code></pre>
     <h3>Manual Install</h3>
     <pre><code># 1. Install dependencies
 pip install -r requirements.txt
@@ -397,6 +405,12 @@ porter --help</code></pre>
       <tr><td><code>porter server logs --follow</code></td><td>Tail logs in real time</td></tr>
       <tr><td><code>porter cf connect</code></td><td>Connect Cloudflare account (OAuth from terminal)</td></tr>
       <tr><td><code>porter cf status</code></td><td>Check Cloudflare connection</td></tr>
+      <tr><td><code>porter cf portal-login [url]</code></td><td>Link a portal account (blank URL = primary portal)</td></tr>
+      <tr><td><code>porter cf connections</code></td><td>List portal accounts (+ locally stored ones)</td></tr>
+      <tr><td><code>porter cf use &lt;id&gt;</code></td><td>Switch active account (offline fallback to local)</td></tr>
+      <tr><td><code>porter cf sync</code></td><td>Re-pull + verify the active account</td></tr>
+      <tr><td><code>porter cf accounts</code></td><td>Show local accounts with verify badges</td></tr>
+      <tr><td><code>porter cf forget &lt;prefix&gt;</code></td><td>Remove an account from this device</td></tr>
       <tr><td><code>porter tunnels</code></td><td>List active tunnels</td></tr>
       <tr><td><code>porter tunnel create &lt;sub&gt; &lt;port&gt;</code></td><td>Create a tunnel</td></tr>
       <tr><td><code>porter tunnel stop &lt;sub&gt;</code></td><td>Stop a tunnel</td></tr>

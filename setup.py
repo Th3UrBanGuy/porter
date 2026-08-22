@@ -12,7 +12,7 @@ setup(
     long_description=open("README.md").read() if __import__("os").path.exists("README.md") else "",
     long_description_content_type="text/markdown",
     author="Tect0nic",
-    url="https://github.com/yourusername/porter",
+    url="https://github.com/Th3UrBanGuy/porter",
     packages=find_packages(),
     python_requires=">=3.8",
     install_requires=[

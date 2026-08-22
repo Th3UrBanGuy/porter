@@ -18,7 +18,11 @@ import httpx
 
 
 TOKENS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tokens.json")
+
+# Primary Porter Connector portal — used when no custom portal is configured.
+DEFAULT_PORTAL_URL = "https://porter-connector.vercel.app"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+ACCOUNTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "accounts.json")
 
 CF_MCP_BASE = "https://mcp.cloudflare.com"
 CF_MCP_URL = f"{CF_MCP_BASE}/mcp"
@@ -41,6 +45,203 @@ def _load_config():
 def _save_config(cfg):
     with open(CONFIG_FILE, "w") as f:
         json.dump(cfg, f, indent=2)
+
+
+def save_config_entry(cfg, url=None, api_key=None, connection_id=None):
+    """Persist connector settings from an externally-built cfg dict."""
+    if url:
+        cfg["portal_url"] = url
+    if api_key:
+        cfg["portal_api_key"] = api_key
+    if connection_id:
+        cfg["portal_connection_id"] = connection_id
+    _save_config(cfg)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Multi-account store — several Cloudflare accounts linked through
+# one or more Connector Portals. Active account = portal_connection_id
+# in config.json + its tokens live in tokens.json (backwards compatible).
+# ═══════════════════════════════════════════════════════════════
+
+def load_accounts():
+    if os.path.exists(ACCOUNTS_FILE):
+        try:
+            with open(ACCOUNTS_FILE) as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def save_accounts(accounts):
+    with open(ACCOUNTS_FILE, "w") as f:
+        json.dump(accounts, f, indent=2)
+
+
+def upsert_account(conn_id, label="", account_name="", payload=None,
+                   verify=None, cfg=None):
+    """
+    Store a connector payload for conn_id (tokens kept locally so the
+    account can be re-activated offline). Returns the entry dict.
+    """
+    accounts = load_accounts()
+    prev = accounts.get(conn_id) or {}
+    entry = {
+        "id": conn_id,
+        "label": label or prev.get("label", ""),
+        "account_name": account_name or prev.get("account_name", ""),
+        "added_at": prev.get("added_at") or int(time.time()),
+        "client_info": (payload or {}).get("client_info") or prev.get("client_info"),
+        "tokens": (payload or {}).get("tokens") or prev.get("tokens"),
+        "last_verify": verify or prev.get("last_verify"),
+    }
+    accounts[conn_id] = entry
+    save_accounts(accounts)
+
+    # Mirror metadata into config so templates/CLI can list cheaply.
+    own_cfg = cfg is None
+    cfg = cfg if cfg is not None else _load_config()
+    metas = [m for m in cfg.get("portal_accounts", []) if m.get("id") != conn_id]
+    meta = {k: entry[k] for k in ("id", "label", "account_name", "added_at")}
+    if entry["last_verify"]:
+        meta["last_verify"] = entry["last_verify"]
+    metas.append(meta)
+    cfg["portal_accounts"] = metas
+    if own_cfg:
+        _save_config(cfg)
+    return entry
+
+
+def apply_connector_payload(payload):
+    """
+    Write a connector token payload ({client_info, tokens}) into tokens.json,
+    keeping any locally-registered OAuth client intact.
+    """
+    tokens = dict(payload.get("tokens") or {})
+    client_info = payload.get("client_info")
+    if isinstance(client_info, dict) and client_info.get("client_id"):
+        tokens.setdefault("client_id", client_info["client_id"])
+
+    storage = TokenStorage()
+    existing_client = storage.get_client_info()
+    storage.set_tokens(tokens)
+    if (
+        isinstance(client_info, dict)
+        and client_info.get("client_id")
+        and not (isinstance(existing_client, dict) and existing_client.get("client_id"))
+    ):
+        storage.set_client_info(client_info)
+    return True
+
+
+def activate_account(conn_id, base_url=None, api_key=None, cfg=None):
+    """Make conn_id the active account: load its stored tokens into
+    tokens.json and update config pointers."""
+    entry = load_accounts().get(conn_id)
+    if not entry or not entry.get("tokens"):
+        return False
+    apply_connector_payload({"tokens": entry["tokens"], "client_info": entry.get("client_info")})
+    cfg = cfg if cfg is not None else _load_config()
+    cfg["portal_connection_id"] = conn_id
+    if base_url:
+        cfg["portal_url"] = base_url
+    if api_key:
+        cfg["portal_api_key"] = api_key
+    _save_config(cfg)
+    return True
+
+
+def forget_account(conn_id, cfg=None):
+    """Remove a stored account; if it was active, activate another saved
+    account (or clear the pointer when none remain)."""
+    accounts = load_accounts()
+    removed = accounts.pop(conn_id, None)
+    if removed is None:
+        return False
+    save_accounts(accounts)
+
+    cfg = cfg if cfg is not None else _load_config()
+    cfg["portal_accounts"] = [
+        m for m in cfg.get("portal_accounts", []) if m.get("id") != conn_id
+    ]
+    if cfg.get("portal_connection_id") == conn_id:
+        nxt = next(iter(accounts), None)
+        cfg["portal_connection_id"] = nxt
+        if nxt:
+            apply_connector_payload(
+                {"tokens": accounts[nxt]["tokens"], "client_info": accounts[nxt].get("client_info")}
+            )
+        else:
+            try:
+                os.remove(TOKENS_FILE)
+            except OSError:
+                pass
+    _save_config(cfg)
+    return True
+
+
+def _verify_with_storage(storage, tokens):
+    """Strict single refresh against Cloudflare using the given storage.
+    No portal fallback — the result reflects only these credentials."""
+    oauth = CloudflareOAuth(storage=storage)
+    data = oauth._do_refresh(tokens)
+    exp = data.get("expires_at") or time.time()
+    mins = max(int((exp - time.time()) / 60), 0)
+    return data, mins
+
+
+def verify_payload(payload):
+    """
+    One-shot credential check for a pulled connector payload: force exactly
+    one token refresh against Cloudflare's OAuth endpoint. Uses a throwaway
+    storage so non-active accounts never touch tokens.json.
+    Returns (ok, detail).
+    """
+    tokens = dict(payload.get("tokens") or {})
+    client_info = payload.get("client_info")
+    if isinstance(client_info, dict) and client_info.get("client_id"):
+        tokens.setdefault("client_id", client_info["client_id"])
+    if not tokens.get("refresh_token"):
+        return False, "payload has no refresh token"
+
+    import tempfile
+    tmp_path = os.path.join(tempfile.gettempdir(), f"porter-verify-{secrets.token_hex(6)}.json")
+    storage = TokenStorage(path=tmp_path)
+    try:
+        if isinstance(client_info, dict) and client_info.get("client_id"):
+            storage.set_client_info(client_info)
+        _, mins = _verify_with_storage(storage, tokens)
+        return True, f"refresh OK — access valid ~{mins} min"
+    except Exception as e:
+        return False, str(e)[:160]
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
+def verify_connection():
+    """
+    Prove the ACTIVE credentials actually work: force exactly one token
+    refresh against Cloudflare. Rotated tokens are persisted on success.
+    Returns (ok, detail).
+    """
+    storage = TokenStorage()
+    tokens = storage.get_tokens()
+    if not tokens or not tokens.get("refresh_token"):
+        return False, "no refresh token stored"
+    try:
+        _, mins = _verify_with_storage(storage, tokens)
+        return True, f"refresh OK — access valid ~{mins} min"
+    except Exception as e:
+        msg = str(e)[:160]
+        # A rejected refresh isn't always fatal — the access token may
+        # still be inside its validity window. Report honestly, not as a pass.
+        if tokens.get("expires_at", 0) > time.time() + 60:
+            return False, f"refresh rejected ({msg[:80]}) but current access token still valid"
+        return False, msg
 
 
 def _b64url(data: bytes) -> str:
@@ -181,37 +382,37 @@ class CloudflareOAuth:
             return token_data
         raise Exception(f"Token exchange failed: {resp.status_code} {resp.text}")
 
-    def _repull_from_broker(self):
+    def _repull_from_connector(self):
         """
         Last-resort credential recovery: pull a fresh token payload from the
-        Porter Broker portal (if configured). This keeps multi-device setups
+        Porter Connector portal (if configured). This keeps multi-device setups
         working when a local refresh token has been rotated elsewhere.
         """
         cfg = _load_config()
-        base = cfg.get("portal_url")
+        base = cfg.get("portal_url") or DEFAULT_PORTAL_URL
         api_key = cfg.get("portal_api_key")
         connection_id = cfg.get("portal_connection_id")
-        if not (base and api_key and connection_id):
+        if not (api_key and connection_id):
             return False
 
         from portal_client import PortalError, pull_token
         try:
             payload = pull_token(base, api_key, connection_id)
         except PortalError as e:
-            log.warning("Broker re-pull failed: %s", e)
+            log.warning("Porter Connector re-pull failed: %s", e)
             return False
 
         tokens = payload.get("tokens") or {}
         client_info = payload.get("client_info")
         # The refresh token is bound to whichever OAuth client issued it —
-        # remember the broker's client so we can refresh with the right id.
+        # remember the portal's client so we can refresh with the right id.
         if isinstance(client_info, dict) and client_info.get("client_id"):
             tokens.setdefault("client_id", client_info["client_id"])
             existing = self.storage.get_client_info()
             if not (isinstance(existing, dict) and existing.get("client_id")):
                 self.storage.set_client_info(client_info)
         self.storage.set_tokens(tokens)
-        log.info("Re-pulled Cloudflare credentials from Porter Broker")
+        log.info("Re-pulled Cloudflare credentials from Porter Connector")
         return True
 
     def refresh_token(self):
@@ -224,8 +425,8 @@ class CloudflareOAuth:
             except Exception as e:
                 first_error = e
 
-        # Fall back to the broker before giving up.
-        if self._repull_from_broker():
+        # Fall back to the connector portal before giving up.
+        if self._repull_from_connector():
             tokens = self.storage.get_tokens()
             if tokens and tokens.get("refresh_token"):
                 try:
@@ -244,7 +445,7 @@ class CloudflareOAuth:
     def _do_refresh(self, tokens):
         metadata = self._discover_metadata()
         client_info = self.storage.get_client_info() or {}
-        # Prefer the client that originally issued the token (the broker's
+        # Prefer the client that originally issued the token (the portal's
         # when credentials were pulled from the portal).
         client_id = (
             tokens.get("client_id")

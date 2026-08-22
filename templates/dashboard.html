@@ -9,7 +9,7 @@
 <link rel="manifest" href="/static/manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
-<title>Dashboard - Tunnel Portal</title>
+<title>Porter — Tunnel Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -200,7 +200,7 @@
 <div class="topbar">
   <div class="top-left">
     <div class="top-logo">&#9729;</div>
-    <span class="top-title">Tunnel Portal</span>
+    <span class="top-title">Porter</span>
   </div>
   <div class="top-right">
     <span class="conn {{ 'on' if is_connected else 'off' }}">
@@ -242,6 +242,30 @@
   <div class="alert alert-warn">
     <span>Cloudflare not connected.</span>
     <a href="/setup" style="color:inherit;font-weight:700;text-decoration:none">Connect now</a>
+  </div>
+  {% endif %}
+
+  {% if cfg.get('portal_accounts') %}
+  <div class="card">
+    <div class="card-title"><span class="icon">&#9678;</span> Cloudflare Accounts
+      <a href="/setup" class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:10px;padding:5px 10px;text-decoration:none;color:var(--text2)">Manage</a>
+    </div>
+    <div class="tunnel-list">
+      {% for a in cfg['portal_accounts'] %}
+      <div class="tunnel-item">
+        <div class="tunnel-dot {{ 'on' if a.id == cfg.get('portal_connection_id') else 'off' }}"></div>
+        <div class="tunnel-info">
+          <div class="tunnel-name">
+            {{ a.account_name or a.label or a.id[:8] }}
+            {% if a.id == cfg.get('portal_connection_id') %}<span class="tunnel-domain-badge">active</span>{% endif %}
+          </div>
+          {% if a.last_verify %}
+          <div class="tunnel-url" style="color:{{ 'var(--green)' if a.last_verify.ok else 'var(--red)' }}">{{ 'verified' if a.last_verify.ok else 'verify failed' }} &middot; {{ a.last_verify.detail }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
   </div>
   {% endif %}
 

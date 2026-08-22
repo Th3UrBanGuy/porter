@@ -1,15 +1,12 @@
-# Secrets & tokens
+# Secrets & runtime state
 config.json
 tokens.json
+accounts.json
 tokens.json.bak
 tunnels.json
 *.bak
-
-# Runtime state
 .bootstrap.lock
 server.pid
-
-# Logs
 *.log
 
 # Python
@@ -18,10 +15,11 @@ __pycache__/
 *.pyo
 *.egg-info/
 
-# IDE
+# IDE / OS
 .vscode/
 .idea/
-
-# OS
 .DS_Store
 Thumbs.db
+.venv/
+.venv/
+server.log

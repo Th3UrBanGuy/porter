@@ -8,6 +8,7 @@ Cross-platform: Linux, macOS, Windows, Termux.
 import argparse
 import json
 import os
+import time
 import subprocess
 import sys
 import getpass
@@ -25,6 +26,9 @@ from porter.platform import (
     find_pid_by_port, is_pid_running, platform_info,
 )
 from porter import output as out
+
+# Primary Porter Connector portal — used when no custom portal link is set.
+DEFAULT_PORTAL_URL = "https://porter-connector.vercel.app"
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -257,6 +261,12 @@ def cmd_cf(args):
     elif action == "sync":
         _cf_portal_sync()
 
+    elif action == "accounts":
+        _cf_portal_accounts()
+
+    elif action == "forget":
+        _cf_portal_forget(getattr(args, "cf_value", None))
+
     else:
         _cf_help()
 
@@ -282,7 +292,7 @@ def _write_json(path, data):
         json.dump(data, f, indent=2)
 
 
-def _require_broker_libs():
+def _require_connector_libs():
     try:
         import httpx  # noqa: F401
         import portal_client
@@ -294,7 +304,7 @@ def _require_broker_libs():
 
 
 def _write_tokens_payload(payload):
-    """Merge a broker payload ({client_info, tokens}) into tokens.json."""
+    """Merge a connector payload ({client_info, tokens}) into tokens.json."""
     _, tokens_file = _paths()
     data = _read_json(tokens_file, default={})
     tokens = payload.get("tokens") or {}
@@ -308,28 +318,86 @@ def _write_tokens_payload(payload):
     _write_json(tokens_file, data)
 
 
-def _apply_chosen_connection(pc, url, api_key, chosen, cfg):
-    payload = pc.pull_token(url, api_key, chosen["id"])
-    _write_tokens_payload(payload)
-    cfg["portal_url"] = pc.normalize_base_url(url)
-    cfg["portal_api_key"] = api_key
-    cfg["portal_connection_id"] = chosen["id"]
-    config_file, _ = _paths()
-    _write_json(config_file, cfg)
+def _add_portal_accounts(pc, url, api_key, conns, chosen_ids, cfg):
+    """
+    Pull, store and verify every selected connection; the first one becomes
+    the active account. Each account is checked with exactly one forced
+    token refresh so a broken link is visible immediately.
+    """
+    from cloudflare_client import (
+        upsert_account,
+        activate_account,
+        verify_payload,
+        save_config_entry,
+    )
+    results = []
+    for cid in chosen_ids:
+        conn = next((c for c in conns if c["id"] == cid), None)
+        if conn is None:
+            continue
+        label = conn.get("cf_account_name") or conn.get("label") or cid[:8]
+        try:
+            payload = pc.pull_token(url, api_key, cid)
+        except pc.PortalError as e:
+            results.append({"id": cid, "label": label, "ok": False, "detail": str(e)[:140]})
+            out.error(f"{label} — pull failed: {str(e)[:100]}")
+            continue
+
+        ok, detail = verify_payload(payload)
+        upsert_account(
+            cid,
+            label=conn.get("label", ""),
+            account_name=conn.get("cf_account_name", ""),
+            payload=payload,
+            verify={"ok": ok, "detail": detail, "ts": int(time.time())},
+            cfg=cfg,
+        )
+        results.append({"id": cid, "label": label, "ok": ok, "detail": detail})
+        if ok:
+            out.success(f"{label} — verified ({detail})")
+        else:
+            out.error(f"{label} — verification FAILED: {detail}")
+
+    # First verified becomes active; fall back to first selected.
+    ok_ids = [r["id"] for r in results if r["ok"]]
+    active_id = ok_ids[0] if ok_ids else chosen_ids[0]
+    activate_account(active_id, base_url=url, api_key=api_key, cfg=cfg)
+    save_config_entry(cfg, url, api_key, active_id)
+    return results
+
+
+def _parse_account_selection(pick, conns):
+    """Parse '1,3' / '*' / '' into a list of connection ids."""
+    pick = (pick or "").strip().lower()
+    if pick in ("*", "all", "a"):
+        idxs = list(range(len(conns)))
+    elif not pick:
+        idxs = [0]
+    else:
+        idxs = []
+        for tok in pick.replace(" ", "").split(","):
+            if tok.isdigit() and 1 <= int(tok) <= len(conns):
+                i = int(tok) - 1
+                if i not in idxs:
+                    idxs.append(i)
+        if not idxs:
+            idxs = [0]
+    return [conns[i]["id"] for i in idxs]
 
 
 def _cf_portal_login(args):
-    pc = _require_broker_libs()
+    pc = _require_connector_libs()
     config_file, _ = _paths()
     cfg = _read_json(config_file)
-    default_url = cfg.get("portal_url", "")
+    # Priority: saved URL -> primary Tectonic Connector Portal.
+    default_url = cfg.get("portal_url", "") or DEFAULT_PORTAL_URL
 
-    out.header("Porter Broker login")
+    out.header("Tectonic Connector Portal login")
     url = (getattr(args, "cf_value", None) or "").strip()
     if not url:
-        url = input(f"Broker URL [{default_url}]: ").strip() or default_url
+        url = input(f"Connector Portal URL [{default_url}]: ").strip() or default_url
     if not url:
-        out.error("Broker URL is required")
+        out.error("Connector Portal URL is required")
         sys.exit(1)
     identifier = input("Email or username: ").strip()
     password = getpass.getpass("Password: ")
@@ -343,8 +411,8 @@ def _cf_portal_login(args):
 
         conns = pc.list_connections(url, api_key)
         if not conns:
-            out.error("No Cloudflare connections on the broker.")
-            out.info("Connect one on the broker dashboard, then run this again.")
+            out.error("No Cloudflare connections in that portal.")
+            out.info("Connect one in the Tectonic Connector Portal dashboard, then run this again.")
             sys.exit(1)
 
         print()
@@ -352,78 +420,191 @@ def _cf_portal_login(args):
             label = c.get("cf_account_name") or c.get("label")
             out.bullet(f"{i}. {label}  {out.dim(c['id'])}")
 
-        pick = input(f"\nSelect account [1-{len(conns)}] (default 1): ").strip()
-        idx = int(pick) - 1 if pick.isdigit() and 0 <= int(pick) - 1 < len(conns) else 0
-        chosen = conns[idx]
+        if len(conns) == 1:
+            chosen_ids = [conns[0]["id"]]
+        else:
+            pick = input(f"\nAdd which accounts? [1] (e.g. 1,3 or * for all): ").strip()
+            chosen_ids = _parse_account_selection(pick, conns)
 
-        _apply_chosen_connection(pc, url, api_key, chosen, cfg)
-        out.success(f"Connected via Porter Broker — {chosen.get('cf_account_name') or chosen['label']}")
+        results = _add_portal_accounts(pc, url, api_key, conns, chosen_ids, cfg)
+        added = len(results)
+        failed = len([r for r in results if not r["ok"]])
+        active_label = results[0]["label"] if results else "?"
+        summary = f"Added {added} account{'s' if added != 1 else ''} via Porter Connector — active: {active_label}"
+        if failed:
+            out.warning(summary + f" ({failed} failed)")
+        else:
+            out.success(summary)
         out.info("Restart the portal server (porter server restart) to pick up credentials.")
     except pc.PortalError as e:
         out.error(str(e))
         sys.exit(1)
 
 
-def _cf_portal_connections():
-    pc = _require_broker_libs()
+def _cf_portal_accounts():
+    """List Cloudflare accounts stored locally on this device."""
+    from cloudflare_client import load_accounts
     config_file, _ = _paths()
     cfg = _read_json(config_file)
-    url, api_key = cfg.get("portal_url"), cfg.get("portal_api_key")
+    active = cfg.get("portal_connection_id")
+    accounts = load_accounts()
+    print()
+    if not accounts:
+        out.info("No accounts stored on this device. Add one: porter cf portal-login")
+        return
+    for a in sorted(accounts.values(), key=lambda x: x.get("added_at") or 0):
+        marker = "*active*" if a["id"] == active else ""
+        lv = a.get("last_verify")
+        if lv:
+            badge = out.c("verified", "green") if lv.get("ok") else out.c("verify failed", "red")
+            extra = f"  ({badge})"
+        else:
+            extra = ""
+        name = a.get("account_name") or a.get("label") or a["id"][:8]
+        out.table_row(name, out.dim(a["id"][:8]), (marker + extra).strip())
+    if not accounts:
+        pass
+
+
+def _cf_portal_forget(value):
+    """Forget a stored account on this device (id or unique prefix)."""
+    if not value:
+        out.error("Usage: porter cf forget <connection-id-or-prefix>")
+        sys.exit(1)
+    from cloudflare_client import load_accounts, forget_account
+    accounts = load_accounts()
+    matches = [cid for cid in accounts if cid == value or cid.startswith(value)]
+    if not matches:
+        out.error(f"No stored account matches '{value}'")
+        sys.exit(1)
+    if len(matches) > 1:
+        out.error("Ambiguous prefix — be more specific:")
+        for m in matches:
+            out.bullet(out.dim(m))
+        sys.exit(1)
+    cfg = _read_json(_paths()[0])
+    was_active = cfg.get("portal_connection_id") == matches[0]
+    forget_account(matches[0])
+    nxt = _read_json(_paths()[0]).get("portal_connection_id")
+    out.success(f"Forgot account {matches[0][:8]}")
+    if was_active and nxt:
+        entry = accounts.get(nxt) or {}
+        out.info(f"Active account switched to {(entry.get('account_name') or entry.get('label') or nxt[:8])}")
+
+
+def _cf_portal_connections():
+    pc = _require_connector_libs()
+    config_file, _ = _paths()
+    cfg = _read_json(config_file)
+    url = cfg.get("portal_url") or DEFAULT_PORTAL_URL
+    api_key = cfg.get("portal_api_key")
     active = cfg.get("portal_connection_id")
     if not (url and api_key):
-        out.error("Not linked to a broker. Run: porter cf portal-login")
+        out.error("Not linked to a Connector Portal. Run: porter cf portal-login")
         sys.exit(1)
     try:
         conns = pc.list_connections(url, api_key)
     except pc.PortalError as e:
         out.error(str(e))
         sys.exit(1)
+    from cloudflare_client import load_accounts
+    stored = load_accounts()
     print()
     for c in conns:
-        marker = " *active*" if c["id"] == active else ""
-        out.table_row(c.get("cf_account_name") or c.get("label"), out.dim(c["id"]), marker.strip())
+        parts = []
+        if c["id"] == active:
+            parts.append("*active*")
+        elif c["id"] in stored:
+            parts.append("+stored")
+        out.table_row(c.get("cf_account_name") or c.get("label"), out.dim(c["id"]), " ".join(parts))
     if not conns:
-        out.info("No connections found on the broker.")
+        out.info("No connections found in that portal.")
 
 
 def _cf_portal_use(connection_id):
-    pc = _require_broker_libs()
+    pc = _require_connector_libs()
     if not connection_id:
         out.error("Usage: porter cf use <connection-id>")
         sys.exit(1)
     config_file, _ = _paths()
     cfg = _read_json(config_file)
-    url, api_key = cfg.get("portal_url"), cfg.get("portal_api_key")
-    if not (url and api_key):
-        out.error("Not linked to a broker. Run: porter cf portal-login")
+    url = cfg.get("portal_url") or DEFAULT_PORTAL_URL
+    api_key = cfg.get("portal_api_key")
+    if not api_key:
+        out.error("Not linked to a Connector Portal. Run: porter cf portal-login")
         sys.exit(1)
+    from cloudflare_client import (
+        load_accounts,
+        activate_account,
+        upsert_account,
+        save_config_entry,
+        verify_connection,
+    )
+    label = connection_id[:8]
     try:
         conns = pc.list_connections(url, api_key)
-        chosen = next((c for c in conns if c["id"] == connection_id), None)
-        if not chosen:
-            out.error(f"Connection {connection_id} not found on broker")
+        # Accept full id or unique prefix.
+        matches = [c for c in conns if c["id"] == connection_id or c["id"].startswith(connection_id)]
+        chosen = matches[0] if len(matches) == 1 else None
+        if chosen is None:
+            if len(matches) > 1:
+                out.error("Ambiguous prefix — be more specific:")
+                for m in matches:
+                    out.bullet(out.dim(m["id"]))
+            else:
+                out.error(f"Connection {connection_id} not found in that portal")
             sys.exit(1)
-        _apply_chosen_connection(pc, url, api_key, chosen, cfg)
-        out.success(f"Switched to {chosen.get('cf_account_name') or chosen['label']}")
+        connection_id = chosen["id"]
+        payload = pc.pull_token(url, api_key, connection_id)
+        upsert_account(
+            connection_id,
+            label=chosen.get("label", ""),
+            account_name=chosen.get("cf_account_name", ""),
+            payload=payload,
+            cfg=cfg,
+        )
+        label = chosen.get("cf_account_name") or chosen.get("label") or label
     except pc.PortalError as e:
-        out.error(str(e))
-        sys.exit(1)
+        # Offline? Fall back to the locally stored copy of this account.
+        stored = load_accounts().get(connection_id)
+        if not (stored and stored.get("tokens")):
+            out.error(str(e))
+            sys.exit(1)
+        out.warning(f"Portal unreachable ({str(e)[:60]}) — using stored credentials")
+
+    if activate_account(connection_id, base_url=url, api_key=api_key):
+        ok, detail = verify_connection()
+        if ok:
+            out.success(f"Switched to {label} — verified ({detail})")
+        else:
+            out.error(f"Switched to {label} — verification FAILED: {detail}")
+            sys.exit(1)
+    else:
+        out.error("No stored credentials for that account")
 
 
 def _cf_portal_sync():
-    pc = _require_broker_libs()
+    pc = _require_connector_libs()
     config_file, _ = _paths()
     cfg = _read_json(config_file)
-    url, api_key = cfg.get("portal_url"), cfg.get("portal_api_key")
+    url = cfg.get("portal_url") or DEFAULT_PORTAL_URL
+    api_key = cfg.get("portal_api_key")
     conn_id = cfg.get("portal_connection_id")
-    if not (url and api_key and conn_id):
-        out.error("Not linked to a broker. Run: porter cf portal-login")
+    if not (api_key and conn_id):
+        out.error("Not linked to a Connector Portal. Run: porter cf portal-login")
         sys.exit(1)
+    from cloudflare_client import upsert_account, save_config_entry, verify_connection
     try:
         payload = pc.pull_token(url, api_key, conn_id)
         _write_tokens_payload(payload)
-        _write_json(config_file, cfg)
-        out.success("Re-pulled Cloudflare credentials from the broker")
+        upsert_account(conn_id, payload=payload, cfg=cfg)
+        save_config_entry(cfg, url, api_key, conn_id)
+        ok, detail = verify_connection()
+        if ok:
+            out.success(f"Re-pulled Cloudflare credentials — verified ({detail})")
+        else:
+            out.error(f"Re-pulled credentials but verification FAILED: {detail}")
+            sys.exit(1)
     except pc.PortalError as e:
         out.error(str(e))
         sys.exit(1)
@@ -439,10 +620,12 @@ def _cf_help():
     out.bullet("porter cf status                 Check connection status")
     out.bullet("porter cf disconnect             Disconnect from Cloudflare")
     out.bullet("porter cf refresh                Refresh OAuth token")
-    out.bullet("porter cf portal-login [url]     Pull credentials from Porter Broker (headless)")
-    out.bullet("porter cf connections            List broker Cloudflare connections")
-    out.bullet("porter cf use <connection-id>    Switch active broker connection")
-    out.bullet("porter cf sync                   Force re-pull active broker connection")
+    out.bullet("porter cf portal-login [url]     Pull credentials from the Tectonic Connector Portal (headless)")
+    out.bullet("porter cf connections            List Connector Portal Cloudflare connections")
+    out.bullet("porter cf use <connection-id>    Switch active connector connection")
+    out.bullet("porter cf sync                   Force re-pull active connector connection")
+    out.bullet("porter cf accounts               List accounts stored on this device")
+    out.bullet("porter cf forget <id>            Forget a stored account (id or prefix)")
     print()
     sys.exit(1)
 
@@ -1312,6 +1495,10 @@ def cmd_status(args):
 # ═══════════════════════════════════════════════════════════════
 
 def main():
+    _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if _repo_root not in sys.path:
+        sys.path.insert(0, _repo_root)
+
     if len(sys.argv) == 1:
         print(HELP)
         sys.exit(0)
